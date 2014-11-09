@@ -283,7 +283,104 @@ void StFlow::eval(size_t jg, doublereal* xg,
     //----------------------------------------------------
 
     doublereal sum, sum2, dtdzj;
+        
+    /********************************************************************************************************************************/
+    /********************************************************************************************************************************/
+    //Calculation of qdotRadiation and qdotExternal
+    
+      //Variable definitions for the Planck absorption coefficient and the radiation calculation:
+      doublereal k_P_H2O = 0;
+      doublereal k_P_CO2 = 0;
+      doublereal k_P_ref = 1.0*OneAtm;
+      doublereal sum_H2O = 0;
+      doublereal sum_CO2 = 0;
+      doublereal k_P = 0;
+      size_t position_H2O = 0;
+      size_t position_CO2 = 0;
+      size_t check_H2O = 0;
+      size_t check_CO2 = 0;
+      //Polynomial coefficients:
+	const doublereal a_H2O[7] = {0.38041e01, -0.27808e01, 0.11672e01, -0.28491, 0.38163e-01, -0.26292e-02, 0.73662e-04};
+	const doublereal a_CO2[7] = {0.22317e01, -0.15829e01, 0.13296e01, -0.50707, 0.93334e-01, -0.83108e-02, 0.28834e-03};
+      //Boundary values:
+	doublereal boundary_Rad_left = 0;
+	doublereal boundary_Rad_right = 0;
+    
+    //Calculation only activated when radiation is on to save CPU time
+    //Calculation of the two boundary values
+    if (do_radiation){
+      boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x,0),4);
+      boundary_Rad_right = epsilon_right * StefanBoltz * pow(T(x,m_points-1),4);
+    }
+    
+    //Loop over all grid points
+    for (size_t jnew = 0; jnew < m_points; jnew++){
+    
+      //Calculation only activated when radiation is on to save CPU time
+      if (do_radiation) {
+	//Calculation of the mean Planck absorption coefficient
+      	//Initialization of the sums to zero
+	sum_H2O = 0;
+	sum_CO2 = 0;
+      
+	//Loop for the polynomial rows
+	for(size_t n = 0; n <= 6; n++){
+	  //Absorption coefficient for H2O
+	  sum_H2O += a_H2O[n] * pow(T(x,jnew)/300, (double)n);
+	  k_P_H2O = pow(10, sum_H2O);
+	  k_P_H2O /= k_P_ref;
+	  //Absorption coefficient for CO2
+	  sum_CO2 += a_CO2[n] * pow(T(x,jnew)/300, (double)n);
+	  k_P_CO2 = pow(10, sum_CO2);
+	  k_P_CO2 /= k_P_ref;
+	}
 
+	//Check if H2O and / or CO2 are in the mechanism and set their positions
+	for (size_t n_comp = 0; n_comp < m_nv; n_comp ++){
+	  if (componentName(n_comp) == "H2O"){
+	    position_H2O = componentIndex("H2O") - c_offset_Y;
+	    check_H2O = 1;
+	  } else if (componentName(n_comp) == "CO2") {
+	    position_CO2 = componentIndex("CO2") - c_offset_Y;
+	    check_CO2 = 1;
+	  }
+	}
+	
+	//Calculation of k_P
+	k_P = m_press * (X(x,position_H2O,jnew) * k_P_H2O * check_H2O + X(x,position_CO2,jnew) * k_P_CO2 * check_CO2);
+      }
+      
+      //Residuum functions for qdotExternal and qdotRadiation
+      //If a component is not used, it will be set to zero on every grid point.
+	//With radiation, without heat term
+	if (do_radiation && ! do_heat_loss) { 
+	  rsd[index(c_offset_qdotExternal+m_nsp, jnew)] = qdotExternal(x,jnew);
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] = 2 * k_P *(2 * StefanBoltz * pow(T(x,jnew),4) - boundary_Rad_left - boundary_Rad_right); 
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] += qdotRadiation(x,jnew);
+	} 
+	//With radiation, with heat term
+	else if (do_radiation && do_heat_loss) { 
+	  rsd[index(c_offset_qdotExternal+m_nsp, jnew)] = m_heat_term.at(jnew) - qdotExternal(x,jnew);
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] = 2 * k_P *(2 * StefanBoltz * pow(T(x,jnew),4) - boundary_Rad_left - boundary_Rad_right);
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] += qdotRadiation(x,jnew);
+	} 
+	//Without radiation, with heat term
+	else if (! do_radiation && do_heat_loss) {
+	  rsd[index(c_offset_qdotExternal+m_nsp, jnew)] = m_heat_term.at(jnew) - qdotExternal(x,jnew);
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] = qdotRadiation(x,jnew);
+	} 
+	//Without radiation, without heat term
+	else { 
+	  //qdotExternal = 0 at all points
+	  rsd[index(c_offset_qdotExternal+m_nsp, jnew)] = qdotExternal(x,jnew);
+	  rsd[index(c_offset_qdotRadiation+m_nsp, jnew)] = qdotRadiation(x,jnew);
+	}
+	diag[index(c_offset_qdotExternal+m_nsp, jnew)] = 0;
+	diag[index(c_offset_qdotRadiation+m_nsp, jnew)] = 0;
+    } //End of the grid point loop
+    /******************************************************************************************************************************/
+    /******************************************************************************************************************************/
+	
     for (j = jmin; j <= jmax; j++) {
 
 
