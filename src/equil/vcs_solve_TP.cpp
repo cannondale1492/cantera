@@ -17,6 +17,7 @@
 #include "cantera/base/clockWC.h"
 #include "cantera/base/stringUtils.h"
 
+#include <algorithm>    //AR To make min and max work
 #include <cstdio>
 
 using namespace std;

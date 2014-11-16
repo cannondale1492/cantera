@@ -21,6 +21,7 @@
 #include "cantera/base/ctexceptions.h"
 
 #include <cstdio>
+#include <algorithm>    //AR To make min and max work
 using namespace std;
 
 namespace VCSnonideal {

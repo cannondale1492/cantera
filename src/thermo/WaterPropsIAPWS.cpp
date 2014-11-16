@@ -13,6 +13,8 @@
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/stringUtils.h"
 
+#include <algorithm>    //AR To make min and max work
+
 namespace Cantera
 {
 /*

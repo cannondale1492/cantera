@@ -15,6 +15,10 @@
 #include <fstream>
 #include <sstream>
 
+
+#include <functional>   //AR To make the bind2nd function work (Line 62)
+
+
 using namespace Cantera;
 using namespace std;
 

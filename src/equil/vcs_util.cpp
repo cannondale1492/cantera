@@ -11,6 +11,7 @@
 #include "cantera/equil/vcs_internal.h"
 #include <cassert>
 
+#include <algorithm>    //AR To make min and max work
 using namespace std;
 
 namespace VCSnonideal
