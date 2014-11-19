@@ -196,6 +196,41 @@ public:
         needJacUpdate();
     }
 
+	///Turn radiation on / off
+	void solveRadiationEqn(bool doRadiation) {
+		if (doRadiation) {
+			do_radiation = true;
+			writelog("Radiative heat losses activated!\n");
+		}
+		else {
+			do_radiation = false;
+			writelog("Radiative heat losses deactivated!\n");
+		}
+	}
+
+	/*! Set the emissivities for the boundary values
+	* 	Reads the emissivities for the left and right boundary
+	* 	values in the radiative term and writes them into the
+	* 	variables, which are used for the calculation.
+	*/
+	void setBoundaryEmissivities(doublereal e_left, doublereal e_right) {
+		char buf[100];
+		if (e_left < 0 || e_left > 1) {
+			throw CanteraError("setBoundaryEmissivities", "e_left must be between 0.0 and 1.0!");
+		}
+		else if (e_right < 0 || e_right > 1) {
+			throw CanteraError("setBoundaryEmissivities", "e_right must be between 0.0 and 1.0!");
+		}
+		else {
+			epsilon_left = e_left;
+			epsilon_right = e_right;
+			sprintf(buf, "The joint emissivity for the left inlet was set to:  %2.6g\n", epsilon_left);
+			writelog(buf);
+			sprintf(buf, "The joint emissivity for the right inlet was set to:  %2.6g\n", epsilon_right);
+			writelog(buf);
+		}
+	}
+
     void fixTemperature(size_t j=npos) {
         if (j == npos)
             for (size_t i = 0; i < m_points; i++) {
@@ -475,11 +510,24 @@ protected:
 
     bool m_ok;
 
+	//Boundary emissivities for the radiation calculations			//AR
+	doublereal epsilon_left;										//AR
+	doublereal epsilon_right;										//AR
+
     // flags
-    std::vector<bool> m_do_energy;
+    std::vector<bool> m_do_energy;	
     bool m_do_soret;
     std::vector<bool> m_do_species;
     int m_transport_option;
+
+	//flag for the radiative heat loss								//AR
+	/*if m_do_radiation is true the radiative heat loss equation	//AR
+	will be solved, else not*/										//AR
+	bool do_radiation;												//AR
+
+	//Radiative heat loss vector									//AR
+	//Vector which contains the values of the radiative heat loss	//AR
+	std::vector<doublereal> m_qdotRadiation;						//AR
 
     // solution estimate
     //vector_fp m_zest;

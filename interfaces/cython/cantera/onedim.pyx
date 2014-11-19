@@ -385,6 +385,14 @@ cdef class _FlowBase(Domain1D):
 
     def __dealloc__(self):
         del self.flow
+        
+    #set boundary emissivities      
+    def set_boundary_emissivities(self, e__left, e__right):
+        self.flow.setBoundaryEmissivities(e__left, e__right)
+        
+    #turn radiation solving on / off
+    def solve_radiation_equation(self, do_Radiation):
+        self.flow.solveRadiationEqn(do_Radiation)
 
 
 cdef CxxIdealGasPhase* getIdealGasPhase(ThermoPhase phase) except *:
