@@ -288,10 +288,7 @@ void StFlow::eval(size_t jg, doublereal* xg,
     /********************************************************************************************************************************/
     /********************************************************************************************************************************/
 	
-	//Calculation of qdotRadiation and qdotExternal
-
-	//Set the number of points in the radiative heat loss vector	//AR
-	m_qdotRadiation.reserve(m_points);								//AR
+	//Calculation of qdotRadiation
 
     //Variable definitions for the Planck absorption coefficient and the radiation calculation:
       doublereal k_P_H2O = 0;
@@ -313,6 +310,9 @@ void StFlow::eval(size_t jg, doublereal* xg,
 
     //Calculation only activated when radiation is on to save CPU time   
 	  if (do_radiation){
+
+		  //Set the number of points in the radiative heat loss vector		//AR
+		  m_qdotRadiation.reserve(m_points);								//AR
 
 		  //Calculation of the two boundary values
 		  boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x, 0), 4);
@@ -360,6 +360,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
 			  radiative_heat_loss = 2 * k_P *(2 * StefanBoltz * pow(T(x, jnew), 4) - boundary_Rad_left - boundary_Rad_right);
 			  //Set the radiative heat loss vector
 			  m_qdotRadiation.push_back(radiative_heat_loss);
+			  //TEST to print out the used values									//AR
+			  //char buf[100];														//AR
+			  //sprintf(buf, "Radiative Loss:  %10.4g \n", m_qdotRadiation.at(j));	//AR
+			  //writelog(buf);														//AR
 
 		  }
 	  }
@@ -482,10 +486,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
                 rsd[index(c_offset_T, j)] /= (m_rho[j]*m_cp[j]);
 
                 rsd[index(c_offset_T, j)] -= rdt*(T(x,j) - T_prev(j));
-
-				//Radiation term added to the energy equation								//AR
-				rsd[index(c_offset_T, j)] -= m_qdotRadiation.at(j) / (m_rho[j] * m_cp[j]);	//AR
-
+				if (do_radiation){																//AR
+					//Radiation term added to the energy equation								//AR
+					rsd[index(c_offset_T, j)] -= m_qdotRadiation.at(j) / (m_rho[j] * m_cp[j]);	//AR
+				}
                 diag[index(c_offset_T, j)] = 1;
             } else {
                 // residual equations if the energy equation is disabled
