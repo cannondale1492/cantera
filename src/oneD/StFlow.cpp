@@ -287,60 +287,57 @@ void StFlow::eval(size_t jg, doublereal* xg,
 	
     /********************************************************************************************************************************/
     /********************************************************************************************************************************/
-	
 	//Calculation of qdotRadiation
-
-    //Variable definitions for the Planck absorption coefficient and the radiation calculation:
-      doublereal k_P_H2O = 0;
-      doublereal k_P_CO2 = 0;
-      doublereal k_P_ref = 1.0*OneAtm;
-      doublereal sum_H2O = 0;
-      doublereal sum_CO2 = 0;
-      doublereal k_P = 0;
-      size_t position_H2O = 0;
-      size_t position_CO2 = 0;
-      size_t check_H2O = 0;
-      size_t check_CO2 = 0;
-    //Polynomial coefficients:
-	  const doublereal a_H2O[7] = {0.38041e01, -0.27808e01, 0.11672e01, -0.28491, 0.38163e-01, -0.26292e-02, 0.73662e-04};
-      const doublereal a_CO2[7] = {0.22317e01, -0.15829e01, 0.13296e01, -0.50707, 0.93334e-01, -0.83108e-02, 0.28834e-03};
-    //Boundary values:
-	  doublereal boundary_Rad_left = 0;
-	  doublereal boundary_Rad_right = 0;
-
     //Calculation only activated when radiation is on to save CPU time   
-	  if (do_radiation){
+    if (do_radiation){
 
-		  //Set the number of points in the radiative heat loss vector		//AR
-		  m_qdotRadiation.reserve(m_points);								//AR
+      //Variable definitions for the Planck absorption coefficient and the radiation calculation:
+        doublereal k_P_H2O = 0;
+        doublereal k_P_CO2 = 0;
+        doublereal k_P_ref = 1.0*OneAtm;
+        doublereal sum_H2O = 0;
+        doublereal sum_CO2 = 0;
+        doublereal k_P = 0;
+        size_t position_H2O = 0;
+        size_t position_CO2 = 0;
+        size_t check_H2O = 0;
+        size_t check_CO2 = 0;
+      //Polynomial coefficients:
+        const doublereal a_H2O[7] = { 0.38041e01, -0.27808e01, 0.11672e01, -0.28491, 0.38163e-01, -0.26292e-02, 0.73662e-04 };
+        const doublereal a_CO2[7] = { 0.22317e01, -0.15829e01, 0.13296e01, -0.50707, 0.93334e-01, -0.83108e-02, 0.28834e-03 };
+      //Boundary values:
+        doublereal boundary_Rad_left = 0;
+        doublereal boundary_Rad_right = 0;
 
-		  //Calculation of the two boundary values
-		  boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x, 0), 4);
-		  boundary_Rad_right = epsilon_right * StefanBoltz * pow(T(x, m_points - 1), 4);
+	  //Set the number of points in the radiative heat loss vector		//AR
+		m_qdotRadiation.reserve(m_points);								//AR
 
+      //Calculation of the two boundary values
+		boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x, 0), 4);
+		boundary_Rad_right = epsilon_right * StefanBoltz * pow(T(x, m_points - 1), 4);
 
-		  //Loop over all grid points
-		  for (size_t jnew = 0; jnew < m_points; jnew++){
+      //Loop over all grid points
+		for (size_t jnew = 0; jnew < m_points; jnew++){
 
-			  //Helping variable for the calculation	//AR
-			  doublereal radiative_heat_loss = 0;		//AR
+          //Helping variable for the calculation	//AR
+			doublereal radiative_heat_loss = 0;		//AR
 
-			  //Calculation of the mean Planck absorption coefficient
-			  //Initialization of the sums to zero
-			  sum_H2O = 0;
-			  sum_CO2 = 0;
+          //Calculation of the mean Planck absorption coefficient
+		  //Initialization of the sums to zero
+            sum_H2O = 0;
+			sum_CO2 = 0;
 
-			  //Loop for the polynomial rows
-			  for (size_t n = 0; n <= 6; n++){
-				  //Absorption coefficient for H2O
-				  sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
-				  k_P_H2O = pow(10, sum_H2O);
-				  k_P_H2O /= k_P_ref;
-				  //Absorption coefficient for CO2
-				  sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
-				  k_P_CO2 = pow(10, sum_CO2);
-				  k_P_CO2 /= k_P_ref;
-			  }
+          //Loop for the polynomial rows
+			for (size_t n = 0; n <= 6; n++){
+              //Absorption coefficient for H2O
+				sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
+				k_P_H2O = pow(10, sum_H2O);
+				k_P_H2O /= k_P_ref;
+			  //Absorption coefficient for CO2
+				sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
+				k_P_CO2 = pow(10, sum_CO2);
+				k_P_CO2 /= k_P_ref;
+			}
 
 			  //Check if H2O and / or CO2 are in the mechanism and set their positions
 			  for (size_t n_comp = 0; n_comp < m_nv; n_comp++){
@@ -359,15 +356,25 @@ void StFlow::eval(size_t jg, doublereal* xg,
 			  //Calculation of the radiative heat loss term  
 			  radiative_heat_loss = 2 * k_P *(2 * StefanBoltz * pow(T(x, jnew), 4) - boundary_Rad_left - boundary_Rad_right);
 			  //Set the radiative heat loss vector
-			  m_qdotRadiation.push_back(radiative_heat_loss);
-			  //TEST to print out the used values									//AR
-			  //char buf[100];														//AR
-			  //sprintf(buf, "Radiative Loss:  %10.4g \n", m_qdotRadiation.at(j));	//AR
-			  //writelog(buf);														//AR
+              m_qdotRadiation[jnew] = radiative_heat_loss;
+              
+              //doublereal testVariable;
+              //testVariable = radiative_heat_loss - m_qdotRadiation[jnew];
+              //TEST to print out the used values									  //AR
+              //char buf[100];														  //AR
+              //sprintf(buf, "Test:  %10.4g \n", testVariable);    //AR
+              //sprintf(buf, "Radiative Loss:  %10.4g \n", m_qdotRadiation[jnew]);    //AR
+              //sprintf(buf, "Radiative Loss:  %10.4g \n", radiative_heat_loss);	  //AR
+			  //writelog(buf);														  //AR
 
 		  }
-	  }
-    
+      } else {
+          for (size_t jnew = 0; jnew < m_points; jnew++){
+              //Set the number of points in the radiative heat loss vector		//AR
+              m_qdotRadiation.reserve(m_points);								//AR
+              m_qdotRadiation[jnew] = 0;
+          }
+      }
     /******************************************************************************************************************************/
     /******************************************************************************************************************************/
     
@@ -486,11 +493,24 @@ void StFlow::eval(size_t jg, doublereal* xg,
                 rsd[index(c_offset_T, j)] /= (m_rho[j]*m_cp[j]);
 
                 rsd[index(c_offset_T, j)] -= rdt*(T(x,j) - T_prev(j));
-				if (do_radiation){																//AR
+                //rsd[index(c_offset_T, j)] -= m_qdotRadiation[j] / (m_rho[j] * m_cp[j]);       //AR
+                
+                if (do_radiation){																//AR
 					//Radiation term added to the energy equation								//AR
-					rsd[index(c_offset_T, j)] -= m_qdotRadiation.at(j) / (m_rho[j] * m_cp[j]);	//AR
+                    rsd[index(c_offset_T, j)] -= m_qdotRadiation[j] / (m_rho[j] * m_cp[j]);     //AR
 				}
+                
                 diag[index(c_offset_T, j)] = 1;
+                
+                /* 
+                //TEST to print out the used values									  //AR
+                doublereal testVariable;                                              //AR
+                testVariable = m_qdotRadiation[j] / (m_rho[j] * m_cp[j]);             //AR
+                char buf[100];														  //AR
+                sprintf(buf, "Test: %10.4g W/m^3 \n", testVariable);                  //AR
+                writelog(buf);													      //AR
+                */
+
             } else {
                 // residual equations if the energy equation is disabled
                 rsd[index(c_offset_T, j)] = T(x,j) - T_fixed(j);
