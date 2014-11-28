@@ -493,11 +493,11 @@ void StFlow::eval(size_t jg, doublereal* xg,
                 rsd[index(c_offset_T, j)] /= (m_rho[j]*m_cp[j]);
 
                 rsd[index(c_offset_T, j)] -= rdt*(T(x,j) - T_prev(j));
-                //rsd[index(c_offset_T, j)] -= m_qdotRadiation[j] / (m_rho[j] * m_cp[j]);       //AR
+                //rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));     //AR
                 
                 if (do_radiation){																//AR
 					//Radiation term added to the energy equation								//AR
-                    rsd[index(c_offset_T, j)] -= m_qdotRadiation[j] / (m_rho[j] * m_cp[j]);     //AR
+                    rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));   //AR
 				}
                 
                 diag[index(c_offset_T, j)] = 1;
@@ -615,6 +615,17 @@ void StFlow::showSolution(const doublereal* x)
         }
     }
     writelog("\n");
+    /*AR*/
+    st_drawline();
+    sprintf(buf, "        z       radiative heat loss");
+    writelog(buf);
+    st_drawline();
+    for (j = 0; j < m_points; j++) {
+        sprintf(buf, "\n %10.4g        %10.4g", m_z[j], m_qdotRadiation[j]);
+        writelog(buf);
+    }
+    writelog("\n");
+    /*AR*/
 }
 
 void StFlow::updateDiffFluxes(const doublereal* x, size_t j0, size_t j1)
@@ -908,7 +919,10 @@ XML_Node& StFlow::save(XML_Node& o, const doublereal* const sol)
         addFloatArray(gv,m_thermo->speciesName(k),
                       x.size(),DATA_PTR(x),"","massFraction");
     }
-
+    /*AR*/
+    addFloatArray(gv, "radiative heat loss", m_z.size(), DATA_PTR(m_qdotRadiation),
+        "W/m^3", "specific power");
+    /*AR*/
     vector_fp values(nPoints());
     for (size_t i = 0; i < nPoints(); i++) {
         values[i] = m_do_energy[i];
