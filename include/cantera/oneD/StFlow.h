@@ -215,9 +215,11 @@ public:
 	void setBoundaryEmissivities(doublereal e_left, doublereal e_right) {
 		char buf[100];
 		if (e_left < 0 || e_left > 1) {
-			throw CanteraError("setBoundaryEmissivities", "The left boundary emissivity must be between 0.0 and 1.0!");
+			throw CanteraError("setBoundaryEmissivities",
+            "The left boundary emissivity must be between 0.0 and 1.0!");
 		} else if (e_right < 0 || e_right > 1) {
-			throw CanteraError("setBoundaryEmissivities", "The right boundary emissivity must be between 0.0 and 1.0!");
+            throw CanteraError("setBoundaryEmissivities",
+            "The right boundary emissivity must be between 0.0 and 1.0!");
 		} else {
 			epsilon_left = e_left;
 			epsilon_right = e_right;
@@ -507,9 +509,9 @@ protected:
 
     bool m_ok;
 
-	//Boundary emissivities for the radiation calculations			//AR
-	doublereal epsilon_left;										//AR
-	doublereal epsilon_right;										//AR
+	// boundary emissivities for the radiation calculations
+	doublereal epsilon_left;
+	doublereal epsilon_right;
 
     // flags
     std::vector<bool> m_do_energy;	
@@ -517,14 +519,12 @@ protected:
     std::vector<bool> m_do_species;
     int m_transport_option;
 
-	//flag for the radiative heat loss								//AR
-	/*if m_do_radiation is true the radiative heat loss equation	//AR
-	will be solved, else not*/										//AR
-	bool do_radiation;												//AR
+	// flag for the radiative heat loss
+	bool do_radiation;
 
-	//Radiative heat loss vector									//AR
-	//Vector which contains the values of the radiative heat loss	//AR
-	std::vector<doublereal> m_qdotRadiation;						//AR
+	// radiative heat loss vector
+	// vector which contains the values of the radiative heat loss
+	std::vector<doublereal> m_qdotRadiation;
 
     // solution estimate
     //vector_fp m_zest;
