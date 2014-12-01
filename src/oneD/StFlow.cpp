@@ -288,6 +288,8 @@ void StFlow::eval(size_t jg, doublereal* xg,
     /********************************************************************************************************************************/
     /********************************************************************************************************************************/
 	//Calculation of qdotRadiation
+    //Set the number of points in the radiative heat loss vector	//AR
+    m_qdotRadiation.reserve(m_points);								//AR
     //Calculation only activated when radiation is on to save CPU time   
     if (do_radiation){
 
@@ -308,9 +310,6 @@ void StFlow::eval(size_t jg, doublereal* xg,
       //Boundary values:
         doublereal boundary_Rad_left = 0;
         doublereal boundary_Rad_right = 0;
-
-	  //Set the number of points in the radiative heat loss vector		//AR
-		m_qdotRadiation.reserve(m_points);								//AR
 
       //Calculation of the two boundary values
 		boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x, 0), 4);
@@ -405,6 +404,9 @@ void StFlow::eval(size_t jg, doublereal* xg,
             rsd[index(c_offset_T,0)] = T(x,0);
             rsd[index(c_offset_L,0)] = -rho_u(x,0);
 
+            //Test for the boundary value //AR
+            //m_qdotRadiation[j] = 0;     //AR
+
             // The default boundary condition for species is zero
             // flux. However, the boundary object may modify
             // this.
@@ -493,12 +495,8 @@ void StFlow::eval(size_t jg, doublereal* xg,
                 rsd[index(c_offset_T, j)] /= (m_rho[j]*m_cp[j]);
 
                 rsd[index(c_offset_T, j)] -= rdt*(T(x,j) - T_prev(j));
-                //rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));     //AR
-                
-                if (do_radiation){																//AR
-					//Radiation term added to the energy equation								//AR
-                    rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));   //AR
-				}
+                rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));       //AR
+
                 
                 diag[index(c_offset_T, j)] = 1;
                 
@@ -970,6 +968,8 @@ void AxiStagnFlow::evalRightBoundary(doublereal* x, doublereal* rsd,
     }
     rsd[index(4,j)] = 1.0 - sum;
     diag[index(4,j)] = 0;
+    //Test for the boundary value //AR
+    //m_qdotRadiation[j] = 0;     //AR
 }
 
 void AxiStagnFlow::evalContinuity(size_t j, doublereal* x, doublereal* rsd,
