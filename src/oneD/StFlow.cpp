@@ -889,10 +889,10 @@ XML_Node& StFlow::save(XML_Node& o, const doublereal* const sol)
         addFloatArray(gv,m_thermo->speciesName(k),
                       x.size(),DATA_PTR(x),"","massFraction");
     }
-    /*AR*/
-    addFloatArray(gv, "radiative heat loss", m_z.size(), DATA_PTR(m_qdotRadiation),
-        "W/m^3", "specific power");
-    /*AR*/
+
+    addFloatArray(gv, "radiative_heat_loss", m_z.size(), DATA_PTR(m_qdotRadiation),
+        "W/m^3", "specificPower");
+
     vector_fp values(nPoints());
     for (size_t i = 0; i < nPoints(); i++) {
         values[i] = m_do_energy[i];
