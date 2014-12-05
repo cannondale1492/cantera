@@ -11,7 +11,6 @@
 #include "cantera/equil/vcs_VolPhase.h"
 #include "cantera/equil/vcs_species_thermo.h"
 #include "cantera/equil/vcs_solve.h"
-#include <algorithm>    //AR To make min and max work
 
 using namespace std;
 

@@ -12,7 +12,6 @@
 #include "cantera/base/ct_defs.h"
 #include "cantera/numerics/ctlapack.h"
 #include "cantera/numerics/ResidJacEval.h"
-#include <algorithm>    //AR To make min and max work
 
 using namespace std;
 

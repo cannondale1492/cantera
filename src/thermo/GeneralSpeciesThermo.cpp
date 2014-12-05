@@ -15,7 +15,6 @@
 #include "cantera/thermo/AdsorbateThermo.h"
 #include "cantera/thermo/SpeciesThermoFactory.h"
 #include <iostream>
-#include <algorithm>    //AR To make min and max work
 
 using namespace std;
 

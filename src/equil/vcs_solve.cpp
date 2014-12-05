@@ -18,7 +18,6 @@
 #include "cantera/equil/vcs_species_thermo.h"
 
 #include "cantera/base/clockWC.h"
-#include <algorithm>    //AR To make min and max work
 
 using namespace std;
 
