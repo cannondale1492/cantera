@@ -8,12 +8,8 @@
  * Contract DE-AC04-94AL85000 with Sandia Corporation, the
  * U.S. Government retains certain rights in this software.
  */
-#include "cantera/base/ct_defs.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/ctml.h"
 #include "cantera/thermo/PDSS_SSVol.h"
-#include "cantera/thermo/ThermoFactory.h"
-
 #include "cantera/thermo/VPStandardStateTP.h"
 
 #include <fstream>
@@ -102,7 +98,7 @@ void PDSS_SSVol::constructPDSSXML(VPStandardStateTP* tp, size_t spindex,
         throw CanteraError("PDSS_SSVol::constructPDSSXML",
                            "no standardState Node for species " + speciesNode.name());
     }
-    std::string model = (*ss)["model"];
+    std::string model = ss->attrib("model");
     if (model == "constant_incompressible" || model == "constant") {
         volumeModel_ = cSSVOLUME_CONSTANT;
         m_constMolarVolume = ctml::getFloat(*ss, "molarVolume", "toSI");
@@ -183,14 +179,6 @@ void PDSS_SSVol::initThermo()
 }
 
 doublereal
-PDSS_SSVol::enthalpy_mole() const
-{
-    doublereal val = enthalpy_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
-}
-
-doublereal
 PDSS_SSVol::enthalpy_RT() const
 {
     return m_hss_RT_ptr[m_spindex];
@@ -206,37 +194,15 @@ PDSS_SSVol::intEnergy_mole() const
 }
 
 doublereal
-PDSS_SSVol::entropy_mole() const
-{
-    doublereal val = entropy_R();
-    return val * GasConstant;
-}
-
-doublereal
 PDSS_SSVol::entropy_R() const
 {
     return m_sss_R_ptr[m_spindex];
 }
 
 doublereal
-PDSS_SSVol::gibbs_mole() const
-{
-    doublereal val = gibbs_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
-}
-
-doublereal
 PDSS_SSVol::gibbs_RT() const
 {
     return m_gss_RT_ptr[m_spindex];
-}
-
-doublereal
-PDSS_SSVol::cp_mole() const
-{
-    doublereal val = m_cpss_R_ptr[m_spindex];
-    return val * GasConstant;
 }
 
 doublereal
@@ -309,24 +275,6 @@ void PDSS_SSVol::calcMolarVolume() const
     } else {
         throw CanteraError("PDSS_SSVol::calcMolarVolume", "unimplemented");
     }
-}
-
-doublereal PDSS_SSVol::critTemperature() const
-{
-    throw CanteraError("PDSS_SSVol::critTemperature()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_SSVol::critPressure() const
-{
-    throw CanteraError("PDSS_SSVol::critPressure()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_SSVol::critDensity() const
-{
-    throw CanteraError("PDSS_SSVol::critDensity()", "unimplemented");
-    return 0.0;
 }
 
 void PDSS_SSVol::setPressure(doublereal p)

@@ -161,7 +161,7 @@ ThermoPhase* newPhase(XML_Node& phase);
  * @return
  *   Returns an initialized ThermoPhase object.
  */
-ThermoPhase* newPhase(const std::string& infile, std::string id);
+ThermoPhase* newPhase(const std::string& infile, std::string id="");
 
 //! Import a phase information into an empty thermophase object
 /*!
@@ -225,10 +225,17 @@ ThermoPhase* newPhase(const std::string& infile, std::string id);
  * @param spfactory species Thermo factory pointer, if
  *                  available. If not available, one will be
  *                  created.
- *
+ * @deprecated the 'spfactory' argument is unused and will be removed after
+ *     Cantera 2.2.
  * @ingroup thermoprops
+ *
+ * @deprecated: The return value of this function is always 'true'. After
+ * Cantera 2.2, this function will return 'void'.
  */
 bool importPhase(XML_Node& phase, ThermoPhase* th, SpeciesThermoFactory* spfactory = 0);
+
+//! Add the elements given in an XML_Node tree to the specified phase
+void installElements(Phase& th, const XML_Node& phaseNode);
 
 //! Install a species into a ThermoPhase object, which defines
 //! the phase thermodynamics and speciation.
@@ -267,7 +274,8 @@ bool importPhase(XML_Node& phase, ThermoPhase* th, SpeciesThermoFactory* spfacto
  *                state thermo properties
  * @param factory Pointer to the SpeciesThermoFactory .
  *              (defaults to 0)
- *
+ * @deprecated The 'factory' argument is unused and will be removed after
+ *     Cantera 2.2.
  * @return
  *  Returns true if everything is ok, false otherwise.
  */

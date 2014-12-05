@@ -7,9 +7,9 @@
 
 #include "cantera/kinetics/ReactionStoichMgr.h"
 
-#include "cantera/kinetics/StoichManager.h"
 #include "cantera/base/ctexceptions.h"
 #include "cantera/kinetics/ReactionData.h"
+#include "cantera/kinetics/Reaction.h"
 
 #include <fstream>
 
@@ -19,6 +19,8 @@ namespace Cantera
 {
 ReactionStoichMgr::ReactionStoichMgr()
 {
+    warn_deprecated("class ReactionStoichMgr",
+        "To be removed after Cantera 2.2.");
     m_dummy.resize(10,1.0);
 }
 
@@ -45,11 +47,10 @@ ReactionStoichMgr& ReactionStoichMgr::operator=(const ReactionStoichMgr& right)
     }
     return *this;
 }
-
-void ReactionStoichMgr::
-add(size_t rxn, const std::vector<size_t>& reactants,
-    const std::vector<size_t>& products,
-    bool reversible)
+//=========================================================================================================
+void ReactionStoichMgr::add(size_t rxn, const std::vector<size_t>& reactants,
+                            const std::vector<size_t>& products,
+                            bool reversible)
 {
 
     m_reactants.add(rxn, reactants);
@@ -60,13 +61,65 @@ add(size_t rxn, const std::vector<size_t>& reactants,
         m_irrevproducts.add(rxn, products);
     }
 }
-
-void ReactionStoichMgr::
-add(size_t rxn, const ReactionData& r)
+//=========================================================================================================
+// Add the reaction into the stoichiometric manager
+void ReactionStoichMgr::add(size_t rxn, const ReactionData& r)
 {
-
+    size_t k;
     std::vector<size_t> rk;
     doublereal frac;
+    doublereal oo, os, of;
+    bool doGlobal = false;
+    std::vector<size_t> extReactants = r.reactants;
+    vector_fp extRStoich = r.rstoich;
+    vector_fp extROrder = r.rorder;
+
+    //
+    //  If we have a complete global reaction then we need to do something more complete
+    //  than the previous treatment.  Basically we will use the reactant manager to calculate the
+    //  global forward reaction rate of progress.
+    //
+    if (r.forwardFullOrder_.size() > 0) {
+	//
+	// Trigger a treatment where the order of the reaction and the stoichiometry
+	// are treated as different.
+	//
+	doGlobal = true;
+	size_t nsp = r.forwardFullOrder_.size();
+	//
+	// Set up a signal vector to indicate whether the species has been added into 
+	// the input vectors for the stoich manager
+	//
+	vector_int kHandled(nsp, 0);
+	//
+	//  Loop over the reactants which are also nonzero stoichioemtric entries
+	//  making sure the forwardFullOrder_ entries take precedence over rorder entries
+	//  
+	for (size_t kk = 0; kk < r.reactants.size(); kk++) {
+	    k = r.reactants[kk];
+	    os = r.rstoich[kk];
+	    oo = r.rorder[kk];
+	    of = r.forwardFullOrder_[k];
+	    if (of != oo) {
+		extROrder[kk] = of;
+	    }
+	    kHandled[k] = 1;
+	}
+	for (k = 0; k < nsp; k++) {
+	    of = r.forwardFullOrder_[k];
+	    if (of != 0.0) {
+		if (kHandled[k] == 0) {
+		    //
+		    // Add extra entries to reactant inputs. Set their reactant stoichiometric entries to zero.
+		    //
+		    extReactants.push_back(k);
+		    extROrder.push_back(of);
+		    extRStoich.push_back(0.0);
+		}
+	    }
+	}
+    }
+    
     bool isfrac = false;
     for (size_t n = 0; n < r.reactants.size(); n++) {
         size_t ns = size_t(r.rstoich[n]);
@@ -79,12 +132,22 @@ add(size_t rxn, const ReactionData& r)
         }
     }
 
-    // if the reaction has fractional stoichiometric coefficients
-    // or specified reaction orders, then add it in a general reaction
-    if (isfrac || r.global || rk.size() > 3) {
-        m_reactants.add(rxn, r.reactants, r.rorder, r.rstoich);
+    //
+    //  If the reaction is non-mass action add it in in a general way
+    //  Reactants get extra terms for the forward reaction rate of progress
+    //  that may have zero stoichiometries.
+    //
+    if (doGlobal) {
+	m_reactants.add(rxn, extReactants, extROrder, extRStoich);
     } else {
-        m_reactants.add(rxn, rk);
+	//
+	//  this is confusing. The only issue should be whether rorder is different than rstoich!
+	//
+	if (isfrac || r.global || rk.size() > 3) {
+	    m_reactants.add(rxn, r.reactants, r.rorder, r.rstoich);
+	} else {
+	    m_reactants.add(rxn, rk);
+	}
     }
 
     std::vector<size_t> pk;
@@ -101,26 +164,29 @@ add(size_t rxn, const ReactionData& r)
     }
 
     if (r.reversible) {
-        if (isfrac && !r.isReversibleWithFrac) {
-            throw CanteraError("ReactionStoichMgr::add",
-                               "Fractional product stoichiometric coefficients only allowed "
-                               "\nfor irreversible reactions and most reversible reactions");
-        }
+	//
+	//  this is confusing. The only issue should be whether porder is different than pstoich!
+	//
         if (pk.size() > 3 || r.isReversibleWithFrac) {
             m_revproducts.add(rxn, r.products, r.porder, r.pstoich);
         } else {
             m_revproducts.add(rxn, pk);
         }
-    } else if (isfrac || pk.size() > 3) {
-        m_irrevproducts.add(rxn, r.products, r.porder,  r.pstoich);
     } else {
-        m_irrevproducts.add(rxn, pk);
+	//
+	//  this is confusing. The only issue should be whether porder is different than pstoich!
+	//
+	if (isfrac || pk.size() > 3) {
+	    m_irrevproducts.add(rxn, r.products, r.porder, r.pstoich);
+	} else {
+	    m_irrevproducts.add(rxn, pk);
+	}
     }
 }
+//=========================================================================================================
 
-void ReactionStoichMgr::
-getCreationRates(size_t nsp, const doublereal* ropf,
-                 const doublereal* ropr, doublereal* c)
+void ReactionStoichMgr::getCreationRates(size_t nsp, const doublereal* ropf,
+                                         const doublereal* ropr, doublereal* c)
 {
     // zero out the output array
     fill(c, c + nsp, 0.0);
@@ -133,9 +199,9 @@ getCreationRates(size_t nsp, const doublereal* ropf,
     m_reactants.incrementSpecies(ropr, c);
 }
 
-void ReactionStoichMgr::
-getDestructionRates(size_t nsp, const doublereal* ropf,
-                    const doublereal* ropr, doublereal* d)
+void ReactionStoichMgr::getDestructionRates(size_t nsp, const doublereal* ropf,
+                                            const doublereal* ropr,
+                                            doublereal* d)
 {
     fill(d, d + nsp, 0.0);
     // the reverse direction destroys products in reversible reactions
@@ -144,8 +210,9 @@ getDestructionRates(size_t nsp, const doublereal* ropf,
     m_reactants.incrementSpecies(ropf, d);
 }
 
-void ReactionStoichMgr::
-getNetProductionRates(size_t nsp, const doublereal* ropnet, doublereal* w)
+void ReactionStoichMgr::getNetProductionRates(size_t nsp, 
+                                              const doublereal* ropnet,
+                                              doublereal* w)
 {
     fill(w, w + nsp, 0.0);
     // products are created for positive net rate of progress
@@ -155,8 +222,8 @@ getNetProductionRates(size_t nsp, const doublereal* ropnet, doublereal* w)
     m_reactants.decrementSpecies(ropnet, w);
 }
 
-void ReactionStoichMgr::
-getReactionDelta(size_t nr, const doublereal* g, doublereal* dg)
+void ReactionStoichMgr::getReactionDelta(size_t nr, const doublereal* g,
+                                         doublereal* dg)
 {
     fill(dg, dg + nr, 0.0);
     // products add
@@ -166,28 +233,25 @@ getReactionDelta(size_t nr, const doublereal* g, doublereal* dg)
     m_reactants.decrementReactions(g, dg);
 }
 
-void ReactionStoichMgr::
-getRevReactionDelta(size_t nr, const doublereal* g, doublereal* dg)
+void ReactionStoichMgr::getRevReactionDelta(size_t nr, const doublereal* g,
+                                            doublereal* dg)
 {
     fill(dg, dg + nr, 0.0);
     m_revproducts.incrementReactions(g, dg);
     m_reactants.decrementReactions(g, dg);
 }
 
-void ReactionStoichMgr::
-multiplyReactants(const doublereal* c, doublereal* r)
+void ReactionStoichMgr::multiplyReactants(const doublereal* c, doublereal* r)
 {
     m_reactants.multiply(c, r);
 }
 
-void ReactionStoichMgr::
-multiplyRevProducts(const doublereal* c, doublereal* r)
+void ReactionStoichMgr::multiplyRevProducts(const doublereal* c, doublereal* r)
 {
     m_revproducts.multiply(c, r);
 }
 
-void ReactionStoichMgr::
-write(const string& filename)
+void ReactionStoichMgr::write(const string& filename)
 {
     ofstream f(filename.c_str());
     f << "namespace mech {" << endl;
@@ -200,8 +264,7 @@ write(const string& filename)
     f.close();
 }
 
-void ReactionStoichMgr::
-writeCreationRates(ostream& f)
+void ReactionStoichMgr::writeCreationRates(ostream& f)
 {
     f << "    void getCreationRates(const doublereal* rf, const doublereal* rb," << endl;
     f << "          doublereal* c) {" << endl;
@@ -218,8 +281,7 @@ writeCreationRates(ostream& f)
     f << "    }" << endl << endl << endl;
 }
 
-void ReactionStoichMgr::
-writeDestructionRates(ostream& f)
+void ReactionStoichMgr::writeDestructionRates(ostream& f)
 {
     f << "    void getDestructionRates(const doublereal* rf, const doublereal* rb," << endl;
     f << "          doublereal* d) {" << endl;
@@ -235,8 +297,7 @@ writeDestructionRates(ostream& f)
     f << "    }" << endl << endl << endl;
 }
 
-void ReactionStoichMgr::
-writeNetProductionRates(ostream& f)
+void ReactionStoichMgr::writeNetProductionRates(ostream& f)
 {
     f << "    void getNetProductionRates(const doublereal* r, doublereal* w) {" << endl;
     map<size_t, string> out;
@@ -252,8 +313,7 @@ writeNetProductionRates(ostream& f)
     f << "    }" << endl << endl << endl;
 }
 
-void ReactionStoichMgr::
-writeMultiplyReactants(ostream& f)
+void ReactionStoichMgr::writeMultiplyReactants(ostream& f)
 {
     f << "    void multiplyReactants(const doublereal* c, doublereal* r) {" << endl;
     map<size_t, string> out;
@@ -266,8 +326,7 @@ writeMultiplyReactants(ostream& f)
     f << "    }" << endl << endl << endl;
 }
 
-void ReactionStoichMgr::
-writeMultiplyRevProducts(ostream& f)
+void ReactionStoichMgr::writeMultiplyRevProducts(ostream& f)
 {
     f << "    void multiplyRevProducts(const doublereal* c, doublereal* r) {" << endl;
     map<size_t, string> out;

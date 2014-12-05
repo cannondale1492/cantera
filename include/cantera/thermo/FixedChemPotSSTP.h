@@ -14,9 +14,7 @@
 #ifndef CT_FIXEDCHEMPOTSSTP_H
 #define CT_FIXEDCHEMPOTSSTP_H
 
-#include "mix_defs.h"
 #include "SingleSpeciesTP.h"
-#include "SpeciesThermo.h"
 
 namespace Cantera
 {
@@ -519,21 +517,6 @@ public:
      */
     virtual void getCp_R_ref(doublereal* cprt) const;
 
-    /*
-     * @internal Initialize. This method is provided to allow
-     * subclasses to perform any initialization required after all
-     * species have been added. For example, it might be used to
-     * resize internal work arrays that must have an entry for
-     * each species.  The base class implementation does nothing,
-     * and subclasses that do not require initialization do not
-     * need to overload this method.  When importing a CTML phase
-     * description, this method is called just prior to returning
-     * from function importPhase.
-     *
-     * @see importCTML.cpp
-     */
-    virtual void initThermo();
-
     virtual void initThermoXML(XML_Node& phaseNode, const std::string& id);
 
     //! Set the equation of state parameters
@@ -560,9 +543,8 @@ public:
 
     //! Set equation of state parameter values from XML entries.
     /*!
-     * This method is called by function importPhase() in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
+     * This method is called by function importPhase() when processing a phase
+     * definition in an input file. It should be overloaded in subclasses to set
      * any parameters that are specific to that particular phase
      * model. Note, this method is called before the phase is
      * initialized with elements and/or species.

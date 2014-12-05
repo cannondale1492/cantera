@@ -7,15 +7,10 @@
 //  Copyright 2001 California Institute of Technology
 
 #include "cantera/equil/ChemEquil.h"
-#include "cantera/numerics/DenseMatrix.h"
 
-#include "cantera/base/ct_defs.h"
-#include "cantera/base/global.h"
 #include "PropertyCalculator.h"
-#include "cantera/base/ctexceptions.h"
-#include "cantera/base/vec_functions.h"
 #include "cantera/base/stringUtils.h"
-#include "cantera/equil/MultiPhase.h"
+#include "cantera/equil/MultiPhaseEquil.h"
 
 using namespace std;
 
@@ -206,9 +201,7 @@ int ChemEquil::setInitialMoles(thermo_t& s, vector_fp& elMoleGoal,
         e.setInitialMixMoles(loglevel-1);
 
         // store component indices
-        if (m_nComponents > m_kk) {
-            m_nComponents = m_kk;
-        }
+        m_nComponents = std::min(m_nComponents, m_kk);
         for (size_t m = 0; m < m_nComponents; m++) {
             m_component[m] = e.componentIndex(m);
         }
@@ -219,8 +212,7 @@ int ChemEquil::setInitialMoles(thermo_t& s, vector_fp& elMoleGoal,
          */
         update(s);
 
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
             writelog("setInitialMoles:   Estimated Mole Fractions\n");
             writelogf("  Temperature = %g\n", s.temperature());
             writelogf("  Pressure = %g\n", s.pressure());
@@ -236,7 +228,6 @@ int ChemEquil::setInitialMoles(thermo_t& s, vector_fp& elMoleGoal,
                           nnn.c_str(), elMoleGoal[m], m_elementmolefracs[m]);
             }
         }
-#endif
 
         iok = 0;
     } catch (CanteraError& err) {
@@ -249,23 +240,13 @@ int ChemEquil::setInitialMoles(thermo_t& s, vector_fp& elMoleGoal,
 int ChemEquil::estimateElementPotentials(thermo_t& s, vector_fp& lambda_RT,
         vector_fp& elMolesGoal, int loglevel)
 {
-    //for (k = 0; k < m_kk; k++) {
-    //    if (m_molefractions[k] > 0.0) {
-    //        m_molefractions[k] = fmaxx(m_molefractions[k], 0.05);
-    //    }
-    //}
-    //s.setState_PX(s.pressure(), m_molefractions.begin());
-
-
     vector_fp b(m_mm, -999.0);
     vector_fp mu_RT(m_kk, 0.0);
     vector_fp xMF_est(m_kk, 0.0);
 
     s.getMoleFractions(DATA_PTR(xMF_est));
     for (size_t n = 0; n < s.nSpecies(); n++) {
-        if (xMF_est[n] < 1.0E-20) {
-            xMF_est[n] = 1.0E-20;
-        }
+        xMF_est[n] = std::max(xMF_est[n], 1e-20);
     }
     s.setMoleFractions(DATA_PTR(xMF_est));
     s.getMoleFractions(DATA_PTR(xMF_est));
@@ -282,28 +263,21 @@ int ChemEquil::estimateElementPotentials(thermo_t& s, vector_fp& lambda_RT,
     for (size_t m = 0; m < m_nComponents; m++) {
         size_t k = m_orderVectorSpecies[m];
         m_component[m] = k;
-        if (xMF_est[k] < 1.0E-8) {
-            xMF_est[k] = 1.0E-8;
-        }
+        xMF_est[k] = std::max(xMF_est[k], 1e-8);
     }
     s.setMoleFractions(DATA_PTR(xMF_est));
     s.getMoleFractions(DATA_PTR(xMF_est));
 
-    size_t nct = Cantera::ElemRearrange(m_nComponents, elMolesGoal, &mp,
-                                        m_orderVectorSpecies, m_orderVectorElements);
-    if (nct != m_nComponents) {
-        throw CanteraError("ChemEquil::estimateElementPotentials",
-                           "confused");
-    }
+    ElemRearrange(m_nComponents, elMolesGoal, &mp,
+                  m_orderVectorSpecies, m_orderVectorElements);
 
     s.getChemPotentials(DATA_PTR(mu_RT));
     doublereal rrt = 1.0/(GasConstant* s.temperature());
     scale(mu_RT.begin(), mu_RT.end(), mu_RT.begin(), rrt);
 
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         for (size_t m = 0; m < m_nComponents; m++) {
-            int isp = m_component[m];
+            int isp = static_cast<int>(m_component[m]);
             string nnn = s.speciesName(isp);
             writelogf("isp = %d, %s\n", isp, nnn.c_str());
         }
@@ -318,7 +292,6 @@ int ChemEquil::estimateElementPotentials(thermo_t& s, vector_fp& lambda_RT,
                       n, nnn.c_str(), xMF_est[n], mu_RT[n]);
         }
     }
-#endif
     DenseMatrix aa(m_nComponents, m_nComponents, 0.0);
     for (size_t m = 0; m < m_nComponents; m++) {
         for (size_t n = 0; n < m_nComponents; n++) {
@@ -338,11 +311,10 @@ int ChemEquil::estimateElementPotentials(thermo_t& s, vector_fp& lambda_RT,
         lambda_RT[m_orderVectorElements[m]] = 0.0;
     }
 
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         writelog(" id      CompSpecies      ChemPot       EstChemPot       Diff\n");
         for (size_t m = 0; m < m_nComponents; m++) {
-            int isp = m_component[m];
+            size_t isp = m_component[m];
             double tmp = 0.0;
             string sname = s.speciesName(isp);
             for (size_t n = 0; n < m_mm; n++) {
@@ -358,7 +330,6 @@ int ChemEquil::estimateElementPotentials(thermo_t& s, vector_fp& lambda_RT,
             writelogf(" %3d  %6s  %10.5g\n", m, ename.c_str(), lambda_RT[m]);
         }
     }
-#endif
     return info;
 }
 
@@ -396,10 +367,6 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
                            "Input ThermoPhase is incompatible with initialization");
     }
 
-#ifdef DEBUG_MODE
-    int n;
-    const vector<string>& eNames = s.elementNames();
-#endif
     initialize(s);
     update(s);
     switch (XY) {
@@ -507,20 +474,11 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
     doublereal tminPhase = s.minTemp();
     // loop to estimate T
     if (!tempFixed) {
-        doublereal tmin;
-        doublereal tmax;
-
-        tmin = s.temperature();
-        if (tmin < tminPhase) {
-            tmin = tminPhase;
-        }
+        doublereal tmin = std::max(s.temperature(), tminPhase);
         if (tmin > tmaxPhase) {
             tmin = tmaxPhase - 20;
         }
-        tmax = tmin + 10.;
-        if (tmax > tmaxPhase) {
-            tmax = tmaxPhase;
-        }
+        doublereal tmax = std::min(tmin + 10., tmaxPhase);
         if (tmax < tminPhase) {
             tmax = tminPhase + 20;
         }
@@ -572,12 +530,7 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
             if (fabs(dt) < 50.0) {
                 break;
             }
-            if (dt >  200.) {
-                dt  = 200.;
-            }
-            if (dt < -200.) {
-                dt = -200.;
-            }
+            dt = clip(dt, -200.0, 200.0);
             if ((t0 + dt) < tminPhase) {
                 dt = 0.5*((t0) + tminPhase) - t0;
             }
@@ -586,13 +539,8 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
             }
             // update the T estimate
             t0 = t0 + dt;
-            if (t0 <= tminPhase || t0 >= tmaxPhase) {
-                printf("We shouldn't be here\n");
-                exit(EXIT_FAILURE);
-            }
-            if (t0 < 100.) {
-                printf("t0 - we are here %g\n", t0);
-                exit(EXIT_FAILURE);
+            if (t0 <= tminPhase || t0 >= tmaxPhase || t0 < 100.0) {
+                throw CanteraError("ChemEquil::equilibrate", "T out of bounds");
             }
             s.setTemperature(t0);
         }
@@ -646,12 +594,6 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
     int info = estimateEP_Brinkley(s, x, elMolesGoal);
     if (info == 0) {
         setToEquilState(s, x, s.temperature());
-        // Tempting -> However, nonideal is a problem. Turn on if not worried
-        //             about nonideality and you are having problems with the main
-        //             algorithm.
-        //if (XY == TP) {
-        // return 0;
-        //}
     }
 
     /*
@@ -686,195 +628,176 @@ int ChemEquil::equilibrate(thermo_t& s, const char* XYstr,
     vector_fp oldresid(nvar, 0.0);
     doublereal f, oldf;
 
-    int iter = 0;
     doublereal fctr = 1.0, newval;
 
-    goto converge;
-next:
-
-    iter++;
-
-    // compute the residual and the jacobian using the current
-    // solution vector
-    equilResidual(s, x, elMolesGoal, res_trial, xval, yval);
-    f = 0.5*dot(res_trial.begin(), res_trial.end(), res_trial.begin());
-
-    // Compute the Jacobian matrix
-    equilJacobian(s, x, elMolesGoal, jac, xval, yval);
-
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0) {
-        writelogf("Jacobian matrix %d:\n", iter);
-        for (m = 0; m <= m_mm; m++) {
-            writelog("      [ ");
-            for (n = 0; n <= m_mm; n++) {
-                writelogf("%10.5g ", jac(m,n));
-            }
-            writelog(" ]");
-            char xName[32];
-            if (m < m_mm) {
-                string nnn = eNames[m];
-                sprintf(xName, "x_%-10s", nnn.c_str());
-            } else {
-                sprintf(xName, "x_XX");
-            }
-            if (m_eloc == m) {
-                sprintf(xName, "x_ELOC");
-            }
-            if (m == m_skip) {
-                sprintf(xName, "x_YY");
-            }
-            writelogf("%-12s", xName);
-            writelogf(" =  - (%10.5g)\n", res_trial[m]);
-        }
-    }
-#endif
-
-    copy(x.begin(), x.end(), oldx.begin());
-    oldf = f;
-    scale(res_trial.begin(), res_trial.end(), res_trial.begin(), -1.0);
-
-    /*
-     * Solve the system
-     */
-    try {
-        info = solve(jac, DATA_PTR(res_trial));
-    } catch (CanteraError& err) {
-        err.save();
-        s.restoreState(state);
-
-        throw CanteraError("equilibrate",
-                           "Jacobian is singular. \nTry adding more species, "
-                           "changing the elemental composition slightly, \nor removing "
-                           "unused elements.");
-        //return -3;
-    }
-
-    // find the factor by which the Newton step can be multiplied
-    // to keep the solution within bounds.
-    fctr = 1.0;
-    for (m = 0; m < nvar; m++) {
-        newval = x[m] + res_trial[m];
-        if (newval > above[m]) {
-            fctr = std::max(0.0,
-                            std::min(fctr,0.8*(above[m] - x[m])/(newval - x[m])));
-        } else if (newval < below[m]) {
-            if (m < m_mm && (m != m_skip)) {
-                res_trial[m] = -50;
-                if (x[m] < below[m] + 50.) {
-                    res_trial[m] = below[m] - x[m];
+    for (int iter = 0; iter < options.maxIterations; iter++)
+    {
+    //  check for convergence.
+        equilResidual(s, x, elMolesGoal, res_trial, xval, yval);
+        f = 0.5*dot(res_trial.begin(), res_trial.end(), res_trial.begin());
+        doublereal xx, yy, deltax, deltay;
+        xx = m_p1->value(s);
+        yy = m_p2->value(s);
+        deltax = (xx - xval)/xval;
+        deltay = (yy - yval)/yval;
+        bool passThis = true;
+        for (m = 0; m < nvar; m++) {
+            double tval =  options.relTolerance;
+            if (m < mm) {
+                /*
+                 * Special case convergence requirements for electron element.
+                 * This is a special case because the element coefficients may
+                 * be both positive and negative. And, typically they sum to 0.0.
+                 * Therefore, there is no natural absolute value for this quantity.
+                 * We supply the absolute value tolerance here. Note, this is
+                 * made easier since the element abundances are normalized to one
+                 * within this routine.
+                 *
+                 * Note, the 1.0E-13 value was recently relaxed from 1.0E-15, because
+                 * convergence failures were found to occur for the lower value
+                 * at small pressure (0.01 pascal).
+                 */
+                if (m == m_eloc) {
+                    tval = elMolesGoal[m] * options.relTolerance + options.absElemTol
+                           + 1.0E-13;
+                } else {
+                    tval = elMolesGoal[m] * options.relTolerance + options.absElemTol;
                 }
-            } else {
-                fctr = std::min(fctr, 0.8*(x[m] - below[m])/(x[m] - newval));
+            }
+            if (fabs(res_trial[m]) > tval) {
+                passThis = false;
             }
         }
-        // Delta Damping
-        if (m == mm) {
-            if (fabs(res_trial[mm]) > 0.2) {
-                fctr = std::min(fctr, 0.2/fabs(res_trial[mm]));
+        if (iter > 0 && passThis && fabs(deltax) < options.relTolerance
+                && fabs(deltay) < options.relTolerance) {
+            options.iterations = iter;
+            doublereal rt = GasConstant* s.temperature();
+            for (m = 0; m < m_mm; m++) {
+                m_lambda[m] = x[m]*rt;
+            }
+
+            if (m_eloc != npos) {
+                adjustEloc(s, elMolesGoal);
+            }
+            /*
+             * Save the calculated and converged element potentials
+             * to the original ThermoPhase object.
+             */
+            s.setElementPotentials(m_lambda);
+            if (s.temperature() > s.maxTemp() + 1.0 ||
+                    s.temperature() < s.minTemp() - 1.0) {
+                writelog("Warning: Temperature ("
+                         +fp2str(s.temperature())+" K) outside "
+                         "valid range of "+fp2str(s.minTemp())+" K to "
+                         +fp2str(s.maxTemp())+" K\n");
+            }
+            return 0;
+        }
+        // compute the residual and the jacobian using the current
+        // solution vector
+        equilResidual(s, x, elMolesGoal, res_trial, xval, yval);
+        f = 0.5*dot(res_trial.begin(), res_trial.end(), res_trial.begin());
+
+        // Compute the Jacobian matrix
+        equilJacobian(s, x, elMolesGoal, jac, xval, yval);
+
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+            writelogf("Jacobian matrix %d:\n", iter);
+            for (m = 0; m <= m_mm; m++) {
+                writelog("      [ ");
+                for (size_t n = 0; n <= m_mm; n++) {
+                    writelogf("%10.5g ", jac(m,n));
+                }
+                writelog(" ]");
+                char xName[32];
+                if (m < m_mm) {
+                    string nnn = s.elementName(m);
+                    sprintf(xName, "x_%-10s", nnn.c_str());
+                } else {
+                    sprintf(xName, "x_XX");
+                }
+                if (m_eloc == m) {
+                    sprintf(xName, "x_ELOC");
+                }
+                if (m == m_skip) {
+                    sprintf(xName, "x_YY");
+                }
+                writelogf("%-12s", xName);
+                writelogf(" =  - (%10.5g)\n", res_trial[m]);
             }
         }
-    }
-    if (fctr != 1.0) {
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
+
+        copy(x.begin(), x.end(), oldx.begin());
+        oldf = f;
+        scale(res_trial.begin(), res_trial.end(), res_trial.begin(), -1.0);
+
+        /*
+         * Solve the system
+         */
+        try {
+            info = solve(jac, DATA_PTR(res_trial));
+        } catch (CanteraError& err) {
+            err.save();
+            s.restoreState(state);
+
+            throw CanteraError("equilibrate",
+                               "Jacobian is singular. \nTry adding more species, "
+                               "changing the elemental composition slightly, \nor removing "
+                               "unused elements.");
+        }
+
+        // find the factor by which the Newton step can be multiplied
+        // to keep the solution within bounds.
+        fctr = 1.0;
+        for (m = 0; m < nvar; m++) {
+            newval = x[m] + res_trial[m];
+            if (newval > above[m]) {
+                fctr = std::max(0.0,
+                                std::min(fctr,0.8*(above[m] - x[m])/(newval - x[m])));
+            } else if (newval < below[m]) {
+                if (m < m_mm && (m != m_skip)) {
+                    res_trial[m] = -50;
+                    if (x[m] < below[m] + 50.) {
+                        res_trial[m] = below[m] - x[m];
+                    }
+                } else {
+                    fctr = std::min(fctr, 0.8*(x[m] - below[m])/(x[m] - newval));
+                }
+            }
+            // Delta Damping
+            if (m == mm) {
+                if (fabs(res_trial[mm]) > 0.2) {
+                    fctr = std::min(fctr, 0.2/fabs(res_trial[mm]));
+                }
+            }
+        }
+        if (fctr != 1.0 && DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
             writelogf("WARNING Soln Damping because of bounds: %g\n", fctr);
         }
-#endif
-    }
 
-    // multiply the step by the scaling factor
-    scale(res_trial.begin(), res_trial.end(), res_trial.begin(), fctr);
+        // multiply the step by the scaling factor
+        scale(res_trial.begin(), res_trial.end(), res_trial.begin(), fctr);
 
-    if (!dampStep(s, oldx, oldf, grad, res_trial,
-                  x, f, elMolesGoal , xval, yval)) {
-        fail++;
-        if (fail > 3) {
-            s.restoreState(state);
-            throw CanteraError("equilibrate",
-                               "Cannot find an acceptable Newton damping coefficient.");
-            //return -4;
-        }
-    } else {
-        fail = 0;
-    }
-
-converge:
-
-    //  check for convergence.
-    equilResidual(s, x, elMolesGoal, res_trial, xval, yval);
-    f = 0.5*dot(res_trial.begin(), res_trial.end(), res_trial.begin());
-    doublereal xx, yy, deltax, deltay;
-    xx = m_p1->value(s);
-    yy = m_p2->value(s);
-    deltax = (xx - xval)/xval;
-    deltay = (yy - yval)/yval;
-    bool passThis = true;
-    for (m = 0; m < nvar; m++) {
-        double tval =  options.relTolerance;
-        if (m < mm) {
-            /*
-             * Special case convergence requirements for electron element.
-             * This is a special case because the element coefficients may
-             * be both positive and negative. And, typically they sum to 0.0.
-             * Therefore, there is no natural absolute value for this quantity.
-             * We supply the absolute value tolerance here. Note, this is
-             * made easier since the element abundances are normalized to one
-             * within this routine.
-             *
-             * Note, the 1.0E-13 value was recently relaxed from 1.0E-15, because
-             * convergence failures were found to occur for the lower value
-             * at small pressure (0.01 pascal).
-             */
-            if (m == m_eloc) {
-                tval = elMolesGoal[m] * options.relTolerance + options.absElemTol
-                       + 1.0E-13;
-            } else {
-                tval = elMolesGoal[m] * options.relTolerance + options.absElemTol;
+        if (!dampStep(s, oldx, oldf, grad, res_trial,
+                      x, f, elMolesGoal , xval, yval)) {
+            fail++;
+            if (fail > 3) {
+                s.restoreState(state);
+                throw CanteraError("equilibrate",
+                                   "Cannot find an acceptable Newton damping coefficient.");
             }
+        } else {
+            fail = 0;
         }
-        if (fabs(res_trial[m]) > tval) {
-            passThis = false;
-        }
-    }
-    if (iter > 0 && passThis
-            && fabs(deltax) < options.relTolerance
-            && fabs(deltay) < options.relTolerance) {
-        options.iterations = iter;
-        doublereal rt = GasConstant* s.temperature();
-        for (m = 0; m < m_mm; m++) {
-            m_lambda[m] = x[m]*rt;
-        }
-
-        if (m_eloc != npos) {
-            adjustEloc(s, elMolesGoal);
-        }
-        /*
-         * Save the calculated and converged element potentials
-         * to the original ThermoPhase object.
-         */
-        s.setElementPotentials(m_lambda);
-        if (s.temperature() > s.maxTemp() + 1.0 ||
-                s.temperature() < s.minTemp() - 1.0) {
-            writelog("Warning: Temperature ("
-                     +fp2str(s.temperature())+" K) outside "
-                     "valid range of "+fp2str(s.minTemp())+" K to "
-                     +fp2str(s.maxTemp())+" K\n");
-        }
-        return 0;
     }
 
     // no convergence
-
-    if (iter > options.maxIterations) {
-        s.restoreState(state);
-        throw CanteraError("equilibrate",
-                           "no convergence in "+int2str(options.maxIterations)
-                           +" iterations.");
-        //return -1;
-    }
-    goto next;
+    s.restoreState(state);
+    throw CanteraError("equilibrate",
+                       "no convergence in "+int2str(options.maxIterations)
+                       +" iterations.");
 }
+
 
 int ChemEquil::dampStep(thermo_t& mix, vector_fp& oldx,
                         double oldf, vector_fp& grad, vector_fp& step, vector_fp& x,
@@ -910,15 +833,13 @@ int ChemEquil::dampStep(thermo_t& mix, vector_fp& oldx,
     for (size_t m = 0; m < x.size(); m++) {
         x[m] = oldx[m] + damp * step[m];
     }
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         writelogf("Solution Unknowns: damp = %g\n", damp);
         writelog("            X_new      X_old       Step\n");
         for (size_t m = 0; m < m_mm; m++) {
             writelogf("     % -10.5g   % -10.5g    % -10.5g\n", x[m], oldx[m], step[m]);
         }
     }
-#endif
     return 1;
 }
 
@@ -953,28 +874,24 @@ void ChemEquil::equilResidual(thermo_t& s, const vector_fp& x,
         }
     }
 
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0 && !m_doResPerturb) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && !m_doResPerturb) {
         writelog("Residual:      ElFracGoal     ElFracCurrent     Resid\n");
-        for (int n = 0; n < m_mm; n++) {
+        for (size_t n = 0; n < m_mm; n++) {
             writelogf("               % -14.7E % -14.7E    % -10.5E\n",
                       elmFracGoal[n], elmFrac[n], resid[n]);
         }
     }
-#endif
 
     xx = m_p1->value(s);
     yy = m_p2->value(s);
     resid[m_mm] = xx/xval - 1.0;
     resid[m_skip] = yy/yval - 1.0;
 
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0 && !m_doResPerturb) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && !m_doResPerturb) {
         writelog("               Goal           Xvalue          Resid\n");
         writelogf("      XX   :   % -14.7E % -14.7E    % -10.5E\n", xval, xx, resid[m_mm]);
         writelogf("      YY(%1d):   % -14.7E % -14.7E    % -10.5E\n", m_skip, yval, yy, resid[m_skip]);
     }
-#endif
 }
 
 void ChemEquil::equilJacobian(thermo_t& s, vector_fp& x,
@@ -987,7 +904,7 @@ void ChemEquil::equilJacobian(thermo_t& s, vector_fp& x,
     r0.resize(len);
     r1.resize(len);
     size_t n, m;
-    doublereal rdx, dx, xsave, dx2;
+    doublereal rdx, dx, xsave;
     doublereal atol = 1.e-10;
 
     equilResidual(s, x, elmols, r0, xval, yval, loglevel-1);
@@ -995,11 +912,7 @@ void ChemEquil::equilJacobian(thermo_t& s, vector_fp& x,
     m_doResPerturb = false;
     for (n = 0; n < len; n++) {
         xsave = x[n];
-        dx = atol;
-        dx2 = fabs(xsave) * 1.0E-7;
-        if (dx2 > dx) {
-            dx = dx2;
-        }
+        dx = std::max(atol, fabs(xsave) * 1.0E-7);
         x[n] = xsave + dx;
         dx = x[n] - xsave;
         rdx = 1.0/dx;
@@ -1039,9 +952,7 @@ double ChemEquil::calcEmoles(thermo_t& s, vector_fp& x, const double& n_t,
         for (size_t m = 0; m < m_mm; m++) {
             tmp += nAtoms(k,m) * x[m];
         }
-        if (tmp > 100.) {
-            tmp = 100.;
-        }
+        tmp = std::min(tmp, 100.0);
         if (tmp < -300.) {
             n_i_calc[k] = 0.0;
         } else {
@@ -1109,17 +1020,10 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
     }
 
     for (m = 0; m < m_mm; m++) {
-        if (x[m] > 50.0) {
-            x[m] = 50.;
-        }
         if (elMoles[m] > 1.0E-70) {
-            if (x[m] < -100) {
-                x[m] = -100.;
-            }
+            x[m] = clip(x[m], -100.0, 50.0);
         } else {
-            if (x[m] < -1000.) {
-                x[m] = -1000.;
-            }
+            x[m] = clip(x[m], -1000.0, 50.0);
         }
     }
 
@@ -1137,9 +1041,7 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
             sum = nAtoms(k,m);
             tmp += sum * x[m];
             sum2 += sum;
-            if (sum2 > nAtomsMax) {
-                nAtomsMax = sum2;
-            }
+            nAtomsMax = std::max(nAtomsMax, sum2);
         }
         if (tmp > 100.) {
             n_t += 2.8E43;
@@ -1148,10 +1050,7 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
         }
     }
 
-
-#ifdef DEBUG_MODE
-    const vector<string>& eNames = s.elementNames();
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         writelog("estimateEP_Brinkley::\n\n");
         double temp = s.temperature();
         double pres = s.pressure();
@@ -1172,7 +1071,6 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
             writelogf("%5s   %13.5g  %13.5g\n",nnn.c_str(), eMolesFix[m], elMoles[m]);
         }
     }
-#endif
     for (m = 0; m < m_mm; m++) {
         if (m != m_eloc) {
             if (elMoles[m] <= options.absElemTol) {
@@ -1196,11 +1094,9 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
         /*
          * Calculate the mole numbers of species
          */
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
             writelogf("START ITERATION %d:\n", iter);
         }
-#endif
         /*
          * Calculate the mole numbers of species and elements.
          */
@@ -1211,9 +1107,7 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
             Xmol_i_calc[k] = n_i_calc[k]/n_t_calc;
         }
 
-
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
             writelog("        Species: Calculated_Moles Calculated_Mole_Fraction\n");
             for (k = 0; k < m_kk; k++) {
                 string nnn = s.speciesName(k);
@@ -1222,11 +1116,10 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
             writelogf("%15s: %10.5g\n", "Total Molar Sum", n_t_calc);
             writelogf("(iter %d) element moles bal:   Goal  Calculated\n", iter);
             for (m = 0; m < m_mm; m++) {
-                string nnn = eNames[m];
+                string nnn = s.elementName(m);
                 writelogf("              %8s: %10.5g %10.5g \n", nnn.c_str(), elMoles[m], eMolesCalc[m]);
             }
         }
-#endif
 
         double nCutoff;
 
@@ -1276,355 +1169,321 @@ int ChemEquil::estimateEP_Brinkley(thermo_t& s, vector_fp& x,
                     resid[m_mm] = 0.1;
                 }
             } else if (n_t > elMolesTotal) {
-                if (resid[m_mm] > 0.0) {
-                    resid[m_mm] = 0.0;
+                resid[m_mm] = std::min(resid[m_mm], 0.0);
+            }
+        } else {
+            /*
+             * Determine whether the matrix should be dumbed down because
+             * the coefficient matrix of species (with significant concentrations)
+             * is rank deficient.
+             *
+             * The basic idea is that at any time during the calculation only a
+             * small subset of species with sufficient concentration matters.
+             * If the rank of the element coefficient matrix for that subset of species
+             * is less than the number of elements, then the matrix created by
+             * the Brinkley method below may become singular.
+             *
+             * The logic below looks for obvious cases where the current element
+             * coefficient matrix is rank deficient.
+             *
+             * The way around rank-deficiency is to lump-sum the corresponding row
+             * of the matrix. Note, lump-summing seems to work very well in terms of
+             * its stability properties, i.e., it heads in the right direction,
+             * albeit with lousy convergence rates.
+             *
+             * NOTE: This probably should be extended to a full blown Gauss-Jordan
+             *       factorization scheme in the future. For Example
+             *       the scheme below would fail for the set: HCl  NH4Cl, NH3.
+             *       Hopefully, it's caught by the equal rows logic below.
+             */
+            for (m = 0; m < m_mm; m++) {
+                lumpSum[m] = 1;
+            }
+
+            nCutoff = 1.0E-9 * n_t_calc;
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                writelog(" Lump Sum Elements Calculation: \n");
+            }
+            for (m = 0; m < m_mm; m++) {
+                size_t kMSp = npos;
+                size_t kMSp2 = npos;
+                int nSpeciesWithElem  = 0;
+                for (k = 0; k < m_kk; k++) {
+                    if (n_i_calc[k] > nCutoff) {
+                        if (fabs(nAtoms(k,m)) > 0.001) {
+                            nSpeciesWithElem++;
+                            if (kMSp != npos) {
+                                kMSp2 = k;
+                                double factor = fabs(nAtoms(kMSp,m) / nAtoms(kMSp2,m));
+                                for (n = 0; n < m_mm; n++) {
+                                    if (fabs(factor *  nAtoms(kMSp2,n) -  nAtoms(kMSp,n)) > 1.0E-8) {
+                                        lumpSum[m] = 0;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                kMSp = k;
+                            }
+                        }
+                    }
+                }
+                if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                    string nnn = s.elementName(m);
+                    writelogf("               %5s %3d : %5d  %5d\n",nnn.c_str(), lumpSum[m], kMSp, kMSp2);
                 }
             }
-            goto updateSolnVector;
-        }
+
+            /*
+             * Formulate the matrix.
+             */
+            for (im = 0; im < m_mm; im++) {
+                m = m_orderVectorElements[im];
+                if (im < m_nComponents) {
+                    for (n = 0; n < m_mm; n++) {
+                        a1(m,n) = 0.0;
+                        for (k = 0; k < m_kk; k++) {
+                            a1(m,n) += nAtoms(k,m) * nAtoms(k,n) * n_i_calc[k];
+                        }
+                    }
+                    a1(m,m_mm) = eMolesCalc[m];
+                    a1(m_mm, m) = eMolesCalc[m];
+                } else {
+                    for (n = 0; n <= m_mm; n++) {
+                        a1(m,n) = 0.0;
+                    }
+                    a1(m,m) = 1.0;
+                }
+            }
+            a1(m_mm, m_mm) = 0.0;
+
+            /*
+             * Formulate the residual, resid, and the estimate for the convergence criteria, sum
+             */
+            sum = 0.0;
+            for (im = 0; im < m_mm; im++) {
+                m = m_orderVectorElements[im];
+                if (im < m_nComponents) {
+                    resid[m] = elMoles[m] - eMolesCalc[m];
+                } else {
+                    resid[m] = 0.0;
+                }
+                /*
+                 * For equations with positive and negative coefficients, (electronic charge),
+                 * we must mitigate the convergence criteria by a condition limited by
+                 * finite precision of inverting a matrix.
+                 * Other equations with just positive coefficients aren't limited by this.
+                 */
+                if (m == m_eloc) {
+                    tmp = resid[m] / (elMoles[m] + elMolesTotal*1.0E-6 + options.absElemTol);
+                } else {
+                    tmp = resid[m] / (elMoles[m] + options.absElemTol);
+                }
+                sum += tmp * tmp;
+            }
+
+            for (m = 0; m < m_mm; m++) {
+                if (a1(m,m) < 1.0E-50) {
+                    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                        writelogf(" NOTE: Diagonalizing the analytical Jac row %d\n", m);
+                    }
+                    for (n = 0; n < m_mm; n++) {
+                        a1(m,n) = 0.0;
+                    }
+                    a1(m,m) = 1.0;
+                    if (resid[m] > 0.0) {
+                        resid[m] = 1.0;
+                    } else if (resid[m] < 0.0) {
+                        resid[m] = -1.0;
+                    } else {
+                        resid[m] = 0.0;
+                    }
+                }
+            }
 
 
-        /*
-         * Determine whether the matrix should be dumbed down because
-         * the coefficient matrix of species (with significant concentrations)
-         * is rank deficient.
-         *
-         * The basic idea is that at any time during the calculation only a
-         * small subset of species with sufficient concentration matters.
-         * If the rank of the element coefficient matrix for that subset of species
-         * is less than the number of elements, then the matrix created by
-         * the Brinkley method below may become singular.
-         *
-         * The logic below looks for obvious cases where the current element
-         * coefficient matrix is rank deficient.
-         *
-         * The way around rank-deficiency is to lump-sum the corresponding row
-         * of the matrix. Note, lump-summing seems to work very well in terms of
-         * its stability properties, i.e., it heads in the right direction,
-         * albeit with lousy convergence rates.
-         *
-         * NOTE: This probably should be extended to a full blown Gauss-Jordan
-         *       factorization scheme in the future. For Example
-         *       the scheme below would fail for the set: HCl  NH4Cl, NH3.
-         *       Hopefully, it's caught by the equal rows logic below.
-         */
-        for (m = 0; m < m_mm; m++) {
-            lumpSum[m] = 1;
-        }
+            resid[m_mm] = n_t - n_t_calc;
 
-        nCutoff = 1.0E-9 * n_t_calc;
-#ifdef DEBUG_MODE
-        writelog(" Lump Sum Elements Calculation: \n", ChemEquil_print_lvl);
-#endif
-        for (m = 0; m < m_mm; m++) {
-            size_t kMSp = npos;
-            size_t kMSp2 = npos;
-            int nSpeciesWithElem  = 0;
-            for (k = 0; k < m_kk; k++) {
-                if (n_i_calc[k] > nCutoff) {
-                    if (fabs(nAtoms(k,m)) > 0.001) {
-                        nSpeciesWithElem++;
-                        if (kMSp != npos) {
-                            kMSp2 = k;
-                            double factor = fabs(nAtoms(kMSp,m) / nAtoms(kMSp2,m));
-                            for (n = 0; n < m_mm; n++) {
-                                if (fabs(factor *  nAtoms(kMSp2,n) -  nAtoms(kMSp,n)) > 1.0E-8) {
-                                    lumpSum[m] = 0;
-                                    break;
-                                }
-                            }
-                        } else {
-                            kMSp = k;
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                writelog("Matrix:\n");
+                for (m = 0; m <= m_mm; m++) {
+                    writelog("       [");
+                    for (n = 0; n <= m_mm; n++) {
+                        writelogf(" %10.5g", a1(m,n));
+                    }
+                    writelogf("]  =   %10.5g\n", resid[m]);
+                }
+            }
+
+            tmp = resid[m_mm] /(n_t + 1.0E-15);
+            sum += tmp * tmp;
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                writelogf("(it %d) Convergence = %g\n", iter, sum);
+            }
+            /*
+             * Insist on 20x accuracy compared to the top routine.
+             * There are instances, for ill-conditioned or
+             * singular matrices where this is needed to move
+             * the system to a point where the matrices aren't
+             * singular.
+             */
+            if (sum < 0.05 * options.relTolerance) {
+                retn = 0;
+                break;
+            }
+
+            /*
+             * Row Sum scaling
+             */
+            for (m = 0; m <= m_mm; m++) {
+                tmp = 0.0;
+                for (n = 0; n <= m_mm; n++) {
+                    tmp += fabs(a1(m,n));
+                }
+                if (m < m_mm && tmp < 1.0E-30) {
+                    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                        writelogf(" NOTE: Diagonalizing row %d\n", m);
+                    }
+                    for (n = 0; n <= m_mm; n++) {
+                        if (n != m) {
+                            a1(m,n) = 0.0;
+                            a1(n,m) = 0.0;
+                        }
+                    }
+                }
+                tmp = 1.0/tmp;
+                for (n = 0; n <= m_mm; n++) {
+                    a1(m,n) *= tmp;
+                }
+                resid[m] *= tmp;
+            }
+
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                writelog("Row Summed Matrix:\n");
+                for (m = 0; m <= m_mm; m++) {
+                    writelog("       [");
+                    for (n = 0; n <= m_mm; n++) {
+                        writelogf(" %10.5g", a1(m,n));
+                    }
+                    writelogf("]  =   %10.5g\n", resid[m]);
+                }
+            }
+            /*
+             * Next Step: We have row-summed the equations.
+             * However, there are some degenerate cases where two
+             * rows will be multiplies of each other in terms of
+             * 0 < m, 0 < m part of the matrix. This occurs on a case
+             * by case basis, and depends upon the current state of the
+             * element potential values, which affect the concentrations
+             * of species.
+             * So, the way we have found to eliminate this problem is to
+             * lump-sum one of the rows of the matrix, except for the
+             * last column, and stick it all on the diagonal.
+             * Then, we at least have a non-singular matrix, and the
+             * modified equation moves the corresponding unknown in the
+             * correct direction.
+             * The previous row-sum operation has made the identification
+             * of identical rows much simpler.
+             *
+             * Note at least 6E-4 is necessary for the comparison.
+             * I'm guessing 1.0E-3. If two rows are anywhere close to being
+             * equivalent, the algorithm can get stuck in an oscillatory mode.
+             */
+            modifiedMatrix = false;
+            for (m = 0; m < m_mm; m++) {
+                size_t sameAsRow = npos;
+                for (size_t im = 0; im < m; im++) {
+                    bool theSame = true;
+                    for (n = 0; n < m_mm; n++) {
+                        if (fabs(a1(m,n) - a1(im,n)) > 1.0E-7) {
+                            theSame = false;
+                            break;
+                        }
+                    }
+                    if (theSame) {
+                        sameAsRow = im;
+                    }
+                }
+                if (sameAsRow != npos || lumpSum[m]) {
+                    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                        if (lumpSum[m]) {
+                            writelogf("Lump summing row %d, due to rank deficiency analysis\n", m);
+                        } else if (sameAsRow != npos) {
+                            writelogf("Identified that rows %d and %d are the same\n", m, sameAsRow);
+                        }
+                    }
+                    modifiedMatrix = true;
+                    for (n = 0; n < m_mm; n++) {
+                        if (n != m) {
+                            a1(m,m) += fabs(a1(m,n));
+                            a1(m,n) = 0.0;
                         }
                     }
                 }
             }
-#ifdef DEBUG_MODE
-            if (ChemEquil_print_lvl > 0) {
-                string nnn = eNames[m];
-                writelogf("               %5s %3d : %5d  %5d\n",nnn.c_str(), lumpSum[m], kMSp, kMSp2);
-            }
-#endif
-        }
 
-        /*
-         * Formulate the matrix.
-         */
-        for (im = 0; im < m_mm; im++) {
-            m = m_orderVectorElements[im];
-            if (im < m_nComponents) {
-                for (n = 0; n < m_mm; n++) {
-                    a1(m,n) = 0.0;
-                    for (k = 0; k < m_kk; k++) {
-                        a1(m,n) += nAtoms(k,m) * nAtoms(k,n) * n_i_calc[k];
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && modifiedMatrix) {
+                writelog("Row Summed, MODIFIED Matrix:\n");
+                for (m = 0; m <= m_mm; m++) {
+                    writelog("       [");
+                    for (n = 0; n <= m_mm; n++) {
+                        writelogf(" %10.5g", a1(m,n));
                     }
+                    writelogf("]  =   %10.5g\n", resid[m]);
                 }
-                a1(m,m_mm) = eMolesCalc[m];
-                a1(m_mm, m) = eMolesCalc[m];
-            } else {
-                for (n = 0; n <= m_mm; n++) {
-                    a1(m,n) = 0.0;
-                }
-                a1(m,m) = 1.0;
             }
-        }
-        a1(m_mm, m_mm) = 0.0;
 
-        /*
-         * Formulate the residual, resid, and the estimate for the convergence criteria, sum
-         */
-        sum = 0.0;
-        for (im = 0; im < m_mm; im++) {
-            m = m_orderVectorElements[im];
-            if (im < m_nComponents) {
-                resid[m] = elMoles[m] - eMolesCalc[m];
-            } else {
-                resid[m] = 0.0;
+            try {
+                solve(a1, DATA_PTR(resid));
+            } catch (CanteraError& err) {
+                err.save();
+                if (DEBUG_MODE_ENABLED) {
+                    writelog("Matrix is SINGULAR.ERROR\n", ChemEquil_print_lvl);
+                }
+                s.restoreState(state);
+                throw CanteraError("equilibrate:estimateEP_Brinkley()",
+                                   "Jacobian is singular. \nTry adding more species, "
+                                   "changing the elemental composition slightly, \nor removing "
+                                   "unused elements.");
             }
+
             /*
-             * For equations with positive and negative coefficients, (electronic charge),
-             * we must mitigate the convergence criteria by a condition limited by
-             * finite precision of inverting a matrix.
-             * Other equations with just positive coefficients aren't limited by this.
+             * Figure out the damping coefficient: Use a delta damping
+             * coefficient formulation: magnitude of change is capped
+             * to exp(1).
              */
-            if (m == m_eloc) {
-                tmp = resid[m] / (elMoles[m] + elMolesTotal*1.0E-6 + options.absElemTol);
-            } else {
-                tmp = resid[m] / (elMoles[m] + options.absElemTol);
+            beta = 1.0;
+            for (m = 0; m < m_mm; m++) {
+                if (resid[m] > 1.0) {
+                    beta = std::min(beta, 1.0 / resid[m]);
+                }
+                if (resid[m] < -1.0) {
+                    beta = std::min(beta, -1.0 / resid[m]);
+                }
             }
-            sum += tmp * tmp;
-        }
-
-        for (m = 0; m < m_mm; m++) {
-            if (a1(m,m) < 1.0E-50) {
-#ifdef DEBUG_MODE
-                if (ChemEquil_print_lvl > 0) {
-                    writelogf(" NOTE: Diagonalizing the analytical Jac row %d\n", m);
-                }
-#endif
-                for (n = 0; n < m_mm; n++) {
-                    a1(m,n) = 0.0;
-                }
-                a1(m,m) = 1.0;
-                if (resid[m] > 0.0) {
-                    resid[m] = 1.0;
-                } else if (resid[m] < 0.0) {
-                    resid[m] = -1.0;
-                } else {
-                    resid[m] = 0.0;
+            if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
+                if (beta != 1.0) {
+                    writelogf("(it %d) Beta = %g\n", iter, beta);
                 }
             }
         }
-
-
-        resid[m_mm] = n_t - n_t_calc;
-
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            writelog("Matrix:\n");
-            for (m = 0; m <= m_mm; m++) {
-                writelog("       [");
-                for (n = 0; n <= m_mm; n++) {
-                    writelogf(" %10.5g", a1(m,n));
-                }
-                writelogf("]  =   %10.5g\n", resid[m]);
-            }
-        }
-#endif
-
-        tmp = resid[m_mm] /(n_t + 1.0E-15);
-        sum += tmp * tmp;
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            writelogf("(it %d) Convergence = %g\n", iter, sum);
-        }
-#endif
-        /*
-         * Insist on 20x accuracy compared to the top routine.
-         * There are instances, for ill-conditioned or
-         * singular matrices where this is needed to move
-         * the system to a point where the matrices aren't
-         * singular.
-         */
-        if (sum < 0.05 * options.relTolerance) {
-            retn = 0;
-            goto exit;
-        }
-
-        /*
-         * Row Sum scaling
-         */
-        for (m = 0; m <= m_mm; m++) {
-            tmp = 0.0;
-            for (n = 0; n <= m_mm; n++) {
-                tmp += fabs(a1(m,n));
-            }
-            if (m < m_mm && tmp < 1.0E-30) {
-#ifdef DEBUG_MODE
-                if (ChemEquil_print_lvl > 0) {
-                    writelogf(" NOTE: Diagonalizing row %d\n", m);
-                }
-#endif
-                for (n = 0; n <= m_mm; n++) {
-                    if (n != m) {
-                        a1(m,n) = 0.0;
-                        a1(n,m) = 0.0;
-                    }
-                }
-            }
-            tmp = 1.0/tmp;
-            for (n = 0; n <= m_mm; n++) {
-                a1(m,n) *= tmp;
-            }
-            resid[m] *= tmp;
-        }
-
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            writelog("Row Summed Matrix:\n");
-            for (m = 0; m <= m_mm; m++) {
-                writelog("       [");
-                for (n = 0; n <= m_mm; n++) {
-                    writelogf(" %10.5g", a1(m,n));
-                }
-                writelogf("]  =   %10.5g\n", resid[m]);
-            }
-        }
-#endif
-        /*
-         * Next Step: We have row-summed the equations.
-         * However, there are some degenerate cases where two
-         * rows will be multiplies of each other in terms of
-         * 0 < m, 0 < m part of the matrix. This occurs on a case
-         * by case basis, and depends upon the current state of the
-         * element potential values, which affect the concentrations
-         * of species.
-         * So, the way we have found to eliminate this problem is to
-         * lump-sum one of the rows of the matrix, except for the
-         * last column, and stick it all on the diagonal.
-         * Then, we at least have a non-singular matrix, and the
-         * modified equation moves the corresponding unknown in the
-         * correct direction.
-         * The previous row-sum operation has made the identification
-         * of identical rows much simpler.
-         *
-         * Note at least 6E-4 is necessary for the comparison.
-         * I'm guessing 1.0E-3. If two rows are anywhere close to being
-         * equivalent, the algorithm can get stuck in an oscillatory mode.
-         */
-        modifiedMatrix = false;
-        for (m = 0; m < m_mm; m++) {
-            size_t sameAsRow = npos;
-            for (size_t im = 0; im < m; im++) {
-                bool theSame = true;
-                for (n = 0; n < m_mm; n++) {
-                    if (fabs(a1(m,n) - a1(im,n)) > 1.0E-7) {
-                        theSame = false;
-                        break;
-                    }
-                }
-                if (theSame) {
-                    sameAsRow = im;
-                }
-            }
-            if (sameAsRow != npos || lumpSum[m]) {
-#ifdef DEBUG_MODE
-                if (ChemEquil_print_lvl > 0) {
-                    if (lumpSum[m]) {
-                        writelogf("Lump summing row %d, due to rank deficiency analysis\n", m);
-                    } else if (sameAsRow != npos) {
-                        writelogf("Identified that rows %d and %d are the same\n", m, sameAsRow);
-                    }
-                }
-#endif
-                modifiedMatrix = true;
-                for (n = 0; n < m_mm; n++) {
-                    if (n != m) {
-                        a1(m,m) += fabs(a1(m,n));
-                        a1(m,n) = 0.0;
-                    }
-                }
-            }
-        }
-
-        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && modifiedMatrix) {
-            writelog("Row Summed, MODIFIED Matrix:\n");
-            for (m = 0; m <= m_mm; m++) {
-                writelog("       [");
-                for (n = 0; n <= m_mm; n++) {
-                    writelogf(" %10.5g", a1(m,n));
-                }
-                writelogf("]  =   %10.5g\n", resid[m]);
-            }
-        }
-
-        try {
-            solve(a1, DATA_PTR(resid));
-        } catch (CanteraError& err) {
-            err.save();
-#ifdef DEBUG_MODE
-            writelog("Matrix is SINGULAR.ERROR\n", ChemEquil_print_lvl);
-#endif
-            s.restoreState(state);
-            throw CanteraError("equilibrate:estimateEP_Brinkley()",
-                               "Jacobian is singular. \nTry adding more species, "
-                               "changing the elemental composition slightly, \nor removing "
-                               "unused elements.");
-            //return -3;
-        }
-
-        /*
-         * Figure out the damping coefficient: Use a delta damping
-         * coefficient formulation: magnitude of change is capped
-         * to exp(1).
-         */
-        beta = 1.0;
-        for (m = 0; m < m_mm; m++) {
-            if (resid[m] > 1.0) {
-                double betat = 1.0 / resid[m];
-                if (betat < beta) {
-                    beta = betat;
-                }
-            }
-            if (resid[m] < -1.0) {
-                double betat = -1.0 / resid[m];
-                if (betat < beta) {
-                    beta = betat;
-                }
-            }
-        }
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            if (beta != 1.0) {
-                writelogf("(it %d) Beta = %g\n", iter, beta);
-            }
-        }
-#endif
-
         /*
          * Update the solution vector
          */
-updateSolnVector:
         for (m = 0; m < m_mm; m++) {
             x[m] += beta * resid[m];
         }
         n_t *= exp(beta * resid[m_mm]);
 
-
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
             writelogf("(it %d)    OLD_SOLUTION  NEW SOLUTION    (undamped updated)\n", iter);
             for (m = 0; m < m_mm; m++) {
-                string eee = eNames[m];
+                string eee = s.elementName(m);
                 writelogf("     %5s   %10.5g   %10.5g   %10.5g\n", eee.c_str(), x_old[m], x[m], resid[m]);
             }
             writelogf("       n_t    %10.5g   %10.5g  %10.5g \n",  x_old[m_mm], n_t, exp(resid[m_mm]));
         }
-#endif
     }
-exit:
-#ifdef DEBUG_MODE
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         double temp = s.temperature();
         double pres = s.pressure();
 
@@ -1636,7 +1495,6 @@ exit:
                       temp, pres);
         }
     }
-#endif
     return retn;
 }
 
@@ -1652,12 +1510,11 @@ void ChemEquil::adjustEloc(thermo_t& s, vector_fp& elMolesGoal)
     s.getMoleFractions(DATA_PTR(m_molefractions));
     size_t k;
 
-#ifdef DEBUG_MODE
-    int maxPosEloc = -1;
-    int maxNegEloc = -1;
+    size_t maxPosEloc = npos;
+    size_t maxNegEloc = npos;
     double maxPosVal = -1.0;
     double maxNegVal = -1.0;
-    if (ChemEquil_print_lvl > 0) {
+    if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0) {
         for (k = 0; k < m_kk; k++) {
             if (nAtoms(k,m_eloc) > 0.0) {
                 if (m_molefractions[k] > maxPosVal && m_molefractions[k] > 0.0) {
@@ -1673,7 +1530,6 @@ void ChemEquil::adjustEloc(thermo_t& s, vector_fp& elMolesGoal)
             }
         }
     }
-#endif
 
     double sumPos = 0.0;
     double sumNeg = 0.0;
@@ -1692,16 +1548,12 @@ void ChemEquil::adjustEloc(thermo_t& s, vector_fp& elMolesGoal)
             return;
         }
         double factor = (elMolesGoal[m_eloc] + sumNeg) / sumPos;
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            if (factor < 0.9999999999) {
-                string nnn = s.speciesName(maxPosEloc);
-                writelogf("adjustEloc: adjusted %s and friends from %g to %g to ensure neutrality condition\n",
-                          nnn.c_str(),
-                          m_molefractions[maxPosEloc], m_molefractions[maxPosEloc]*factor);
-            }
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && factor < 0.9999999999) {
+            string nnn = s.speciesName(maxPosEloc);
+            writelogf("adjustEloc: adjusted %s and friends from %g to %g to ensure neutrality condition\n",
+                      nnn.c_str(),
+                      m_molefractions[maxPosEloc], m_molefractions[maxPosEloc]*factor);
         }
-#endif
         for (k = 0; k < m_kk; k++) {
             if (nAtoms(k,m_eloc) > 0.0) {
                 m_molefractions[k] *= factor;
@@ -1709,16 +1561,12 @@ void ChemEquil::adjustEloc(thermo_t& s, vector_fp& elMolesGoal)
         }
     } else {
         double factor = (-elMolesGoal[m_eloc] + sumPos) / sumNeg;
-#ifdef DEBUG_MODE
-        if (ChemEquil_print_lvl > 0) {
-            if (factor < 0.9999999999) {
-                string nnn = s.speciesName(maxNegEloc);
-                writelogf("adjustEloc: adjusted %s and friends from %g to %g to ensure neutrality condition\n",
-                          nnn.c_str(),
-                          m_molefractions[maxNegEloc], m_molefractions[maxNegEloc]*factor);
-            }
+        if (DEBUG_MODE_ENABLED && ChemEquil_print_lvl > 0 && factor < 0.9999999999) {
+            string nnn = s.speciesName(maxNegEloc);
+            writelogf("adjustEloc: adjusted %s and friends from %g to %g to ensure neutrality condition\n",
+                      nnn.c_str(),
+                      m_molefractions[maxNegEloc], m_molefractions[maxNegEloc]*factor);
         }
-#endif
         for (k = 0; k < m_kk; k++) {
             if (nAtoms(k,m_eloc) < 0.0) {
                 m_molefractions[k] *= factor;

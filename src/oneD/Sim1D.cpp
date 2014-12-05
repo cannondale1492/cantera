@@ -5,6 +5,9 @@
 #include "cantera/oneD/Sim1D.h"
 #include "cantera/oneD/MultiJac.h"
 #include "cantera/oneD/StFlow.h"
+#include "cantera/numerics/funcs.h"
+#include "cantera/base/xml.h"
+
 #include <fstream>
 
 using namespace std;
@@ -12,17 +15,9 @@ using namespace std;
 namespace Cantera
 {
 
-static void sim1D_drawline()
-{
-    string s(78,'.');
-    s += '\n';
-    writelog(s.c_str());
-}
-
 Sim1D::Sim1D() :
     OneDim()
 {
-    //writelog("Sim1D default constructor\n");
 }
 
 Sim1D::Sim1D(vector<Domain1D*>& domains) :
@@ -39,7 +34,6 @@ Sim1D::Sim1D(vector<Domain1D*>& domains) :
 
     // set some defaults
     m_tstep = 1.0e-5;
-    //m_maxtimestep = 10.0;
     m_steps.push_back(1);
     m_steps.push_back(2);
     m_steps.push_back(5);
@@ -133,8 +127,7 @@ void Sim1D::restore(const std::string& fname, const std::string& id,
         throw CanteraError("Sim1D::restore","No solution with id = "+id);
     }
 
-    vector<XML_Node*> xd;
-    f->getChildren("domain", xd);
+    vector<XML_Node*> xd = f->getChildren("domain");
     if (xd.size() != m_nd) {
         throw CanteraError("Sim1D::restore", "Solution does not contain the "
                            " correct number of domains. Found " +
@@ -238,8 +231,7 @@ void Sim1D::solve(int loglevel, bool refine_grid)
 
         bool ok = false;
         if (loglevel > 0) {
-            writelog("\n");
-            sim1D_drawline();
+            writeline('.', 78, true, true);
         }
         while (!ok) {
             writelog("Attempt Newton solution of steady-state problem...", loglevel);
@@ -300,14 +292,11 @@ void Sim1D::solve(int loglevel, bool refine_grid)
                 } else {
                     nsteps = m_steps[istep];
                 }
-                if (dt > m_tmax) {
-                    dt = m_tmax;
-                }
+                dt = std::min(dt, m_tmax);
             }
         }
         if (loglevel > 0) {
-            sim1D_drawline();
-            writelog("\n");
+            writeline('.', 78, true, true);
         }
         if (loglevel > 2) {
             showSolution();
@@ -387,7 +376,6 @@ int Sim1D::refine(int loglevel)
                     zmid = 0.5*(d.grid(m) + d.grid(m+1));
                     znew.push_back(zmid);
                     np++;
-                    //writelog(string("refine: adding point at ")+fp2str(zmid)+"\n");
 
                     // for each component, linearly interpolate
                     // the solution to this point
@@ -411,8 +399,7 @@ int Sim1D::refine(int loglevel)
     size_t gridstart = 0, gridsize;
     for (size_t n = 0; n < m_nd; n++) {
         Domain1D& d = domain(n);
-        //            Refiner& r = d.refiner();
-        gridsize = dsize[n]; // d.nPoints() + r.nNewPoints();
+        gridsize = dsize[n];
         d.setupGrid(gridsize, DATA_PTR(znew) + gridstart);
         gridstart += gridsize;
     }
@@ -423,8 +410,6 @@ int Sim1D::refine(int loglevel)
 
     // resize the work array
     m_xnew.resize(xnew.size());
-
-    //        copy(xnew.begin(), xnew.end(), m_xnew.begin());
 
     resize();
     finalize();
@@ -512,8 +497,7 @@ int Sim1D::setFixedTemperature(doublereal t)
     size_t gridstart = 0, gridsize;
     for (n = 0; n < m_nd; n++) {
         Domain1D& d = domain(n);
-        //            Refiner& r = d.refiner();
-        gridsize = dsize[n]; // d.nPoints() + r.nNewPoints();
+        gridsize = dsize[n];
         d.setupGrid(gridsize, DATA_PTR(znew) + gridstart);
         gridstart += gridsize;
     }

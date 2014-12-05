@@ -3,7 +3,6 @@
  */
 #include "NasaThermo.h"
 
-#include "cantera/base/utilities.h"
 #include "cantera/numerics/DenseMatrix.h"
 #include "cantera/numerics/ctlapack.h"
 
@@ -15,9 +14,12 @@ NasaThermo::NasaThermo() :
     m_tlow_max(0.0),
     m_thigh_min(1.e30),
     m_p0(-1.0),
-    m_ngroups(0) {
+    m_ngroups(0)
+{
+    warn_deprecated("class NasaThermo", "To be removed after "
+        "Cantera 2.2. Use GeneralSpeciesThermo instead.");
     m_t.resize(6);
-    }
+}
 
 NasaThermo::NasaThermo(const NasaThermo& right) :
     ID(NASA),
@@ -25,7 +27,7 @@ NasaThermo::NasaThermo(const NasaThermo& right) :
     m_thigh_min(1.e30),
     m_p0(-1.0),
     m_ngroups(0) {
-    *this = operator=(right);
+    *this = right;
 }
 
 NasaThermo& NasaThermo::operator=(const NasaThermo& right)
@@ -37,6 +39,7 @@ NasaThermo& NasaThermo::operator=(const NasaThermo& right)
         return *this;
     }
 
+    SpeciesThermo::operator=(right);
     m_high           = right.m_high;
     m_low            = right.m_low;
     m_index          = right.m_index;
@@ -60,6 +63,12 @@ void NasaThermo::install(const std::string& name, size_t index, int type,
                          doublereal min_temp, doublereal max_temp,
                          doublereal ref_pressure)
 {
+    if (type != NASA) {
+        throw CanteraError("NasaThermo::install",
+                           "Incompatible thermo parameterization: Got " +
+                           int2str(type) + " but " + int2str(NASA) +
+                           " was expected.");
+    }
     m_name[index] = name;
     int imid = int(c[0]);       // midpoint temp converted to integer
     int igrp = m_index[imid];   // has this value been seen before?
@@ -90,12 +99,8 @@ void NasaThermo::install(const std::string& name, size_t index, int type,
     m_low[igrp-1].push_back(NasaPoly1(index, tlow, tmid,
                                       ref_pressure, &clow[0]));
 
-    if (tlow > m_tlow_max) {
-        m_tlow_max = tlow;
-    }
-    if (thigh < m_thigh_min) {
-        m_thigh_min = thigh;
-    }
+    m_tlow_max = std::max(tlow, m_tlow_max);
+    m_thigh_min = std::min(thigh, m_thigh_min);
     if (m_tlow.size() < index + 1) {
         m_tlow.resize(index + 1,  tlow);
         m_thigh.resize(index + 1, thigh);
@@ -113,6 +118,7 @@ void NasaThermo::install(const std::string& name, size_t index, int type,
         throw CanteraError("install()", "species have different reference pressures");
     }
     m_p0 = ref_pressure;
+    markInstalled(index);
 }
 
 void NasaThermo::update_one(size_t k, doublereal t, doublereal* cp_R,
@@ -125,8 +131,8 @@ void NasaThermo::update_one(size_t k, doublereal t, doublereal* cp_R,
     m_t[4] = 1.0/t;
     m_t[5] = log(t);
 
-    size_t grp = m_group_map[k];
-    size_t pos = m_posInGroup_map[k];
+    size_t grp = getValue(m_group_map, k);
+    size_t pos = getValue(m_posInGroup_map, k);
     const std::vector<NasaPoly1> &mlg = m_low[grp-1];
     const NasaPoly1* nlow = &(mlg[pos]);
 
@@ -177,8 +183,8 @@ void NasaThermo::reportParams(size_t index, int& type,
 {
     type = reportType(index);
     if (type == NASA) {
-        size_t grp = m_group_map[index];
-        size_t pos = m_posInGroup_map[index];
+        size_t grp = getValue(m_group_map, index);
+        size_t pos = getValue(m_posInGroup_map, index);
         const std::vector<NasaPoly1> &mlg = m_low[grp-1];
         const std::vector<NasaPoly1> &mhg = m_high[grp-1];
         const NasaPoly1* lowPoly  = &(mlg[pos]);
@@ -191,28 +197,30 @@ void NasaThermo::reportParams(size_t index, int& type,
         lowPoly->reportParameters(n, itype, minTemp, ttemp, refPressure,
                                   c + 1);
         if (n != index) {
-            throw CanteraError("  ", "confused");
+            throw CanteraError("NasaThermo::reportParams", "Index mismatch");
         }
         if (itype != NASA1) {
-            throw CanteraError("  ", "confused");
+            throw CanteraError("NasaThermo::reportParams",
+                               "Thermo type mismatch for low-T polynomial");
         }
         highPoly->reportParameters(n, itype, ttemp, maxTemp, refPressure,
                                    c + 8);
         if (n != index) {
-            throw CanteraError("  ", "confused");
+            throw CanteraError("NasaThermo::reportParams", "Index mismatch");
         }
         if (itype != NASA1) {
-            throw CanteraError("  ", "confused");
+            throw CanteraError("NasaThermo::reportParams",
+                               "Thermo type mismatch for high-T polynomial");
         }
     } else {
-        throw CanteraError(" ", "confused");
+        throw CanteraError("NasaThermo::reportParams", "Thermo type mismatch");
     }
 }
 
-doublereal NasaThermo::reportOneHf298(const int k) const
+doublereal NasaThermo::reportOneHf298(const size_t k) const
 {
-    int grp = m_group_map[k];
-    int pos = m_posInGroup_map[k];
+    size_t grp = getValue(m_group_map, k);
+    size_t pos = getValue(m_posInGroup_map, k);
     const std::vector<NasaPoly1> &mlg = m_low[grp-1];
     const NasaPoly1* nlow = &(mlg[pos]);
     doublereal tmid = nlow->maxTemp();
@@ -227,10 +235,10 @@ doublereal NasaThermo::reportOneHf298(const int k) const
     return h;
 }
 
-void NasaThermo::modifyOneHf298(const int k, const doublereal Hf298New)
+void NasaThermo::modifyOneHf298(const size_t k, const doublereal Hf298New)
 {
-    int grp = m_group_map[k];
-    int pos = m_posInGroup_map[k];
+    size_t grp = getValue(m_group_map, k);
+    size_t pos = getValue(m_posInGroup_map, k);
     std::vector<NasaPoly1> &mlg = m_low[grp-1];
     NasaPoly1* nlow = &(mlg[pos]);
     std::vector<NasaPoly1> &mhg = m_high[grp-1];
@@ -430,7 +438,7 @@ void NasaThermo::fixDiscontinuities(doublereal Tlow, doublereal Tmid,
     // First get the desired size of the work array
     ct_dgelss(nRows, nCols, 1, &M(0,0), nRows, &b[0], nRows,
               &sigma[0], -1, rank, &work[0], lwork, info);
-    work.resize(work[0]);
+    work.resize(static_cast<size_t>(work[0]));
     lwork = static_cast<int>(work[0]);
     ct_dgelss(nRows, nCols, 1, &M(0,0), nRows, &b[0], nRows,
               &sigma[0], -1, rank, &work[0], lwork, info);

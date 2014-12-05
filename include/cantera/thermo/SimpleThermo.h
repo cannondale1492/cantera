@@ -11,6 +11,7 @@
 #include "SpeciesThermoMgr.h"
 #include "speciesThermoTypes.h"
 #include "cantera/base/global.h"
+#include "cantera/base/utilities.h"
 
 namespace Cantera
 {
@@ -43,6 +44,7 @@ namespace Cantera
  * @see ConstCpPoly
  *
  * @ingroup mgrsrefcalc
+ * @deprecated To be removed after Cantera 2.2. Use GeneralSpeciesThermo instead.
  */
 class SimpleThermo : public SpeciesThermo
 {
@@ -57,13 +59,17 @@ public:
         m_tlow_max(0.0),
         m_thigh_min(1.e30),
         m_p0(-1.0),
-        m_nspData(0) {}
+        m_nspData(0) {
+        warn_deprecated("class SimpleThermo", "To be removed after "
+            "Cantera 2.2. Use GeneralSpeciesThermo instead.");
+    }
 
     //! Copy constructor
     /*!
      * @param right Object to be copied
      */
     SimpleThermo(const SimpleThermo& right) :
+        SpeciesThermo(right),
         ID(SIMPLE),
         m_tlow_max(0.0),
         m_thigh_min(1.e30),
@@ -72,7 +78,7 @@ public:
         /*
          * Call the assignment operator
          */
-        *this = operator=(right);
+        *this = right;
     }
 
     //! Assignment operator
@@ -87,6 +93,7 @@ public:
             return *this;
         }
 
+        SpeciesThermo::operator=(right);
         m_loc          = right.m_loc;
         m_index        = right.m_index;
         m_tlow_max     = right.m_tlow_max;
@@ -133,7 +140,12 @@ public:
      */
     virtual void install(const std::string& name, size_t index, int type, const doublereal* c,
                          doublereal minTemp_, doublereal maxTemp_, doublereal refPressure_) {
-
+        if (type != SIMPLE) {
+            throw CanteraError("SimpleThermo::install",
+                               "Incompatible thermo parameterization: Got " +
+                               int2str(type) + " but " + int2str(SIMPLE) +
+                               " was expected.");
+        }
         m_logt0.push_back(log(c[0]));
         m_t0.push_back(c[0]);
         m_h0_R.push_back(c[1]/GasConstant);
@@ -144,13 +156,8 @@ public:
         m_nspData++;
         doublereal tlow  = minTemp_;
         doublereal thigh = maxTemp_;
-
-        if (tlow > m_tlow_max) {
-            m_tlow_max = tlow;
-        }
-        if (thigh < m_thigh_min) {
-            m_thigh_min = thigh;
-        }
+        m_tlow_max = std::max(tlow, m_tlow_max);
+        m_thigh_min = std::min(thigh, m_thigh_min);
 
         if (m_tlow.size() < index + 1) {
             m_tlow.resize(index + 1,  tlow);
@@ -171,6 +178,7 @@ public:
             throw CanteraError("install()", "Species have different reference pressures");
         }
         m_p0 = refPressure_;
+        markInstalled(index);
     }
 
     virtual void install_STIT(SpeciesThermoInterpType* stit_ptr) {
@@ -202,7 +210,7 @@ public:
                             doublereal* h_RT, doublereal* s_R) const {
         doublereal logt = log(t);
         doublereal rt = 1.0/t;
-        size_t loc = m_loc[k];
+        size_t loc = getValue(m_loc, k);
         cp_R[k] = m_cp0_R[loc];
         h_RT[k] = rt*(m_h0_R[loc] + (t - m_t0[loc]) * m_cp0_R[loc]);
         s_R[k] = m_s0_R[loc] + m_cp0_R[loc] * (logt - m_logt0[loc]);
@@ -212,7 +220,7 @@ public:
         if (k == npos) {
             return m_tlow_max;
         } else {
-            return m_tlow[m_loc[k]];
+            return m_tlow[getValue(m_loc, k)];
         }
     }
 
@@ -220,7 +228,7 @@ public:
         if (k == npos) {
             return m_thigh_min;
         } else {
-            return m_thigh[m_loc[k]];
+            return m_thigh[getValue(m_loc, k)];
         }
     }
 
@@ -251,7 +259,7 @@ public:
                               doublereal& maxTemp_,
                               doublereal& refPressure_) const {
         type = reportType(index);
-        size_t loc = m_loc[index];
+        size_t loc = getValue(m_loc, index);
         if (type == SIMPLE) {
             c[0] = m_t0[loc];
             c[1] = m_h0_R[loc] * GasConstant;
@@ -263,11 +271,11 @@ public:
         }
     }
 
-    virtual doublereal reportOneHf298(int k) const {
+    virtual doublereal reportOneHf298(const size_t k) const {
         throw CanteraError("reportHF298", "unimplemented");
     }
 
-    virtual void modifyOneHf298(const int k, const doublereal Hf298New) {
+    virtual void modifyOneHf298(const size_t k, const doublereal Hf298New) {
         throw CanteraError("reportHF298", "unimplemented");
     }
 
@@ -279,7 +287,7 @@ protected:
      * This index keeps track of it.
      *      indexData = m_loc[kspec]
      */
-    mutable std::map<size_t, size_t> m_loc;
+    std::map<size_t, size_t> m_loc;
 
     //! Map between the vector index where the coefficients are kept and the species index
     /*!

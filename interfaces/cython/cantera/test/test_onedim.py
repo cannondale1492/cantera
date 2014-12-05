@@ -47,6 +47,45 @@ class TestOnedim(utilities.CanteraTest):
         self.assertArrayNear(inlet.X, Xref)
         self.assertArrayNear(inlet.Y, Yref)
 
+        inlet.X = {'H2':0.3, 'O2':0.5, 'AR':0.2}
+        self.assertNear(inlet.X[gas2.species_index('H2')], 0.3)
+
+    def test_grid_check(self):
+        gas = ct.Solution('h2o2.xml')
+        flame = ct.FreeFlow(gas)
+
+        with self.assertRaises(RuntimeError):
+            flame.grid = [0, 0.1, 0.1, 0.2]
+
+        with self.assertRaises(RuntimeError):
+            flame.grid = [0, 0.1, 0.2, 0.05]
+
+    def test_unpicklable(self):
+        import pickle
+        gas = ct.Solution('h2o2.xml')
+        flame = ct.FreeFlow(gas)
+        with self.assertRaises(NotImplementedError):
+            pickle.dumps(flame)
+
+    def test_uncopyable(self):
+        import copy
+        gas = ct.Solution('h2o2.xml')
+        flame = ct.FreeFlow(gas)
+        with self.assertRaises(NotImplementedError):
+            copy.copy(flame)
+
+    def test_invalid_property(self):
+        gas1 = ct.Solution('h2o2.xml')
+        inlet = ct.Inlet1D(name='something', phase=gas1)
+        flame = ct.FreeFlow(gas1)
+        sim = ct.Sim1D((inlet, flame))
+
+        for x in (inlet, flame, sim):
+            with self.assertRaises(AttributeError):
+                x.foobar = 300
+            with self.assertRaises(AttributeError):
+                x.foobar
+
 
 class TestFreeFlame(utilities.CanteraTest):
     tol_ss = [1.0e-5, 1.0e-14]  # [rtol atol] for steady-state problem
@@ -283,7 +322,6 @@ class TestFreeFlame(utilities.CanteraTest):
             k2 = gas2.species_index(species)
             self.assertArrayNear(Y1[k1], Y2[k2])
 
-
     def test_save_restore_remove_species(self):
         reactants= 'H2:1.1, O2:1, AR:5'
         p = 2 * ct.one_atm
@@ -311,6 +349,18 @@ class TestFreeFlame(utilities.CanteraTest):
         for k2, species in enumerate(gas2.species_names):
             k1 = gas1.species_index(species)
             self.assertArrayNear(Y1[k1], Y2[k2])
+
+    def test_refine_criteria_boundscheck(self):
+        self.create_sim(ct.one_atm, 300.0, 'H2:1.1, O2:1, AR:5')
+        good = [3.0, 0.1, 0.2, 0.05]
+        bad = [1.2, 1.1, -2, 0.3]
+
+        self.sim.set_refine_criteria(*good)
+        for i in range(4):
+            with self.assertRaises(Exception):
+                vals = list(good)
+                vals[i] = bad[i]
+                self.sim.set_refine_criteria(*vals)
 
 
 class TestDiffusionFlame(utilities.CanteraTest):
@@ -382,6 +432,84 @@ class TestDiffusionFlame(utilities.CanteraTest):
         data[:,2] = self.sim.V
         data[:,3] = self.sim.T
         data[:,4:] = self.sim.Y.T
+
+        if saveReference:
+            np.savetxt(self.referenceFile, data, '%11.6e', ', ')
+        else:
+            bad = utilities.compareProfiles(self.referenceFile, data,
+                                            rtol=1e-2, atol=1e-8, xtol=1e-2)
+            self.assertFalse(bad, bad)
+
+    def test_strain_rate(self):
+        # This doesn't test that the values are correct, just that they can be
+        # computed without error
+
+        self.create_sim(p=ct.one_atm)
+        self.solve_fixed_T()
+
+        a_max = self.sim.strain_rate('max')
+        a_mean = self.sim.strain_rate('mean')
+        a_pf_fuel = self.sim.strain_rate('potential_flow_fuel')
+        a_pf_oxidizer = self.sim.strain_rate('potential_flow_oxidizer')
+        a_stoich1 = self.sim.strain_rate('stoichiometric', fuel='H2')
+        a_stoich2 = self.sim.strain_rate('stoichiometric', fuel='H2', stoich=0.5)
+
+        self.assertLessEqual(a_mean, a_max)
+        self.assertLessEqual(a_pf_fuel, a_max)
+        self.assertLessEqual(a_pf_oxidizer, a_max)
+        self.assertLessEqual(a_stoich1, a_max)
+        self.assertEqual(a_stoich1, a_stoich2)
+
+        with self.assertRaises(ValueError):
+            self.sim.strain_rate('bad_keyword')
+        with self.assertRaises(KeyError): # missing 'fuel'
+            self.sim.strain_rate('stoichiometric')
+        with self.assertRaises(KeyError): # missing 'stoich'
+            self.sim.strain_rate('stoichiometric', fuel='H2', oxidizer='H2O2')
+
+
+class TestCounterflowPremixedFlame(utilities.CanteraTest):
+    referenceFile = '../data/CounterflowPremixedFlame-h2-mix.csv'
+    # Note: to re-create the reference file:
+    # (1) set PYTHONPATH to build/python2 or build/python3.
+    # (2) Start Python in the test/work directory and run:
+    #     >>> import cantera.test
+    #     >>> t = cantera.test.test_onedim.TestCounterflowPremixedFlame("test_mixture_averaged")
+    #     >>> t.test_mixture_averaged(True)
+
+    def test_mixture_averaged(self, saveReference=False):
+        T_in = 373.0  # inlet temperature
+        comp = 'H2:1.6, O2:1, AR:7'  # premixed gas composition
+
+        gas = ct.Solution('h2o2.xml')
+        gas.TPX = T_in, 0.05 * ct.one_atm, comp
+        initial_grid = np.linspace(0.0, 0.2, 12)  # m
+
+        sim = ct.CounterflowPremixedFlame(gas=gas, grid=initial_grid)
+
+        # set the properties at the inlets
+        sim.reactants.mdot = 0.12  # kg/m^2/s
+        sim.reactants.X = comp
+        sim.reactants.T = T_in
+        sim.products.mdot = 0.06  # kg/m^2/s
+
+        sim.flame.set_steady_tolerances(default=[1.0e-5, 1.0e-11])
+        sim.flame.set_transient_tolerances(default=[1.0e-5, 1.0e-11])
+        sim.set_initial_guess()  # assume adiabatic equilibrium products
+
+        sim.energy_enabled = False
+        sim.solve(loglevel=0, refine_grid=False)
+
+        sim.set_refine_criteria(ratio=3, slope=0.2, curve=0.4, prune=0.02)
+        sim.energy_enabled = True
+        sim.solve(loglevel=0, refine_grid=True)
+
+        data = np.empty((sim.flame.n_points, gas.n_species + 4))
+        data[:,0] = sim.grid
+        data[:,1] = sim.u
+        data[:,2] = sim.V
+        data[:,3] = sim.T
+        data[:,4:] = sim.Y.T
 
         if saveReference:
             np.savetxt(self.referenceFile, data, '%11.6e', ', ')

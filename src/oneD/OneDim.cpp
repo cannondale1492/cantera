@@ -1,5 +1,4 @@
 //! @file OneDim.cpp
-#include "cantera/oneD/MultiJac.h"
 #include "cantera/oneD/MultiNewton.h"
 #include "cantera/oneD/OneDim.h"
 
@@ -7,6 +6,7 @@
 #include "cantera/base/ctml.h"
 
 #include <fstream>
+#include <ctime>
 
 using namespace ctml;
 using namespace std;
@@ -19,7 +19,7 @@ OneDim::OneDim()
       m_jac(0), m_newt(0),
       m_rdt(0.0), m_jac_ok(false),
       m_nd(0), m_bw(0), m_size(0),
-      m_init(false),
+      m_init(false), m_pts(0), m_solve_time(0.0),
       m_ss_jac_age(10), m_ts_jac_age(20),
       m_interrupt(0), m_nevals(0), m_evaltime(0.0)
 {
@@ -31,7 +31,7 @@ OneDim::OneDim(vector<Domain1D*> domains) :
     m_jac(0), m_newt(0),
     m_rdt(0.0), m_jac_ok(false),
     m_nd(0), m_bw(0), m_size(0),
-    m_init(false),
+    m_init(false), m_solve_time(0.0),
     m_ss_jac_age(10), m_ts_jac_age(20),
     m_interrupt(0), m_nevals(0), m_evaltime(0.0)
 {
@@ -127,6 +127,17 @@ void OneDim::saveStats()
             m_evaltime = 0.0;
         }
     }
+}
+
+void OneDim::clearStats()
+{
+    m_gridpts.clear();
+    m_jacEvals.clear();
+    m_jacElapsed.clear();
+    m_funcEvals.clear();
+    m_funcElapsed.clear();
+    m_nevals = 0;
+    m_evaltime = 0.0;
 }
 
 void OneDim::resize()
@@ -338,10 +349,7 @@ doublereal OneDim::timeStep(int nsteps, doublereal dt, doublereal* x,
             if (m == 100) {
                 dt *= 1.5;
             }
-            //                 else dt /= 1.5;
-            if (dt > m_tmax) {
-                dt = m_tmax;
-            }
+            dt = std::min(dt, m_tmax);
         }
 
         // No solution could be found with this time step.
@@ -377,21 +385,17 @@ void OneDim::save(const std::string& fname, std::string id,
     XML_Node* ct;
     if (fin) {
         root.build(fin);
-        const XML_Node* same_ID = root.findID(id);
-        int jid = 1;
-        string idnew = id;
-        while (same_ID != 0) {
-            idnew = id + "_" + int2str(jid);
-            jid++;
-            same_ID = root.findID(idnew);
+        // Remove existing solution with the same id
+        XML_Node* same_ID = root.findID(id);
+        if (same_ID) {
+            same_ID->parent()->removeChild(same_ID);
         }
-        id = idnew;
         fin.close();
         ct = &root.child("ctml");
     } else {
         ct = &root.addChild("ctml");
     }
-    XML_Node& sim = (XML_Node&)ct->addChild("simulation");
+    XML_Node& sim = ct->addChild("simulation");
     sim.addAttribute("id",id);
     addString(sim,"timestamp",asctime(newtime));
     if (desc != "") {

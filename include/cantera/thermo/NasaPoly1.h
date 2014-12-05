@@ -13,9 +13,7 @@
 #define CT_NASAPOLY1_H
 // Copyright 2001  California Institute of Technology
 
-#include "cantera/base/global.h"
 #include "SpeciesThermoInterpType.h"
-#include <iostream>
 
 namespace Cantera
 {
@@ -64,8 +62,7 @@ public:
     NasaPoly1(size_t n, doublereal tlow, doublereal thigh, doublereal pref,
               const doublereal* coeffs) :
         SpeciesThermoInterpType(n, tlow, thigh, pref),
-        m_coeff(vector_fp(7)) {
-        std::copy(coeffs, coeffs + 7, m_coeff.begin());
+        m_coeff(coeffs, coeffs + 7) {
     }
 
     //! copy constructor
@@ -74,11 +71,8 @@ public:
      */
     NasaPoly1(const NasaPoly1& b) :
         SpeciesThermoInterpType(b),
-        m_coeff(vector_fp(7))
+        m_coeff(b.m_coeff)
     {
-        std::copy(b.m_coeff.begin(),
-                  b.m_coeff.begin() + 7,
-                  m_coeff.begin());
     }
 
     //! assignment operator
@@ -88,9 +82,7 @@ public:
     NasaPoly1& operator=(const NasaPoly1& b) {
         if (&b != this) {
             SpeciesThermoInterpType::operator=(b);
-            std::copy(b.m_coeff.begin(),
-                      b.m_coeff.begin() + 7,
-                      m_coeff.begin());
+            m_coeff = b.m_coeff;
         }
         return *this;
     }
@@ -103,6 +95,17 @@ public:
 
     virtual int reportType() const {
         return NASA1;
+    }
+
+    virtual size_t temperaturePolySize() const { return 6; }
+
+    virtual void updateTemperaturePoly(double T, double* T_poly) const {
+        T_poly[0] = T;
+        T_poly[1] = T * T;
+        T_poly[2] = T_poly[1] * T;
+        T_poly[3] = T_poly[2] * T;
+        T_poly[4] = 1.0 / T;
+        T_poly[5] = std::log(T);
     }
 
     //! Update the properties for this species, given a temperature polynomial
@@ -153,12 +156,7 @@ public:
                                       doublereal* cp_R, doublereal* h_RT,
                                       doublereal* s_R) const {
         double tPoly[6];
-        tPoly[0]  = temp;
-        tPoly[1]  = temp * temp;
-        tPoly[2]  = tPoly[1] * temp;
-        tPoly[3]  = tPoly[2] * temp;
-        tPoly[4]  = 1.0 / temp;
-        tPoly[5]  = std::log(temp);
+        updateTemperaturePoly(temp, tPoly);
         updateProperties(tPoly, cp_R, h_RT, s_R);
     }
 
@@ -194,12 +192,7 @@ public:
     virtual doublereal reportHf298(doublereal* const h298 = 0) const {
         double tt[6];
         double temp = 298.15;
-        tt[0]  = temp;
-        tt[1]  = temp * temp;
-        tt[2]  = tt[1] * temp;
-        tt[3]  = tt[2] * temp;
-        tt[4]  = 1.0 / temp;
-        //tt[5]  = std::log(temp);
+        updateTemperaturePoly(temp, tt);
         doublereal ct0 = m_coeff[2];          // a0
         doublereal ct1 = m_coeff[3]*tt[0];    // a1 * T
         doublereal ct2 = m_coeff[4]*tt[1];    // a2 * T^2
@@ -216,7 +209,7 @@ public:
         return h;
     }
 
-    virtual void modifyOneHf298(const size_t& k, const doublereal Hf298New) {
+    virtual void modifyOneHf298(const size_t k, const doublereal Hf298New) {
         if (k != m_index) {
             return;
         }

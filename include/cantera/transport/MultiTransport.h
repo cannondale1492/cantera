@@ -10,13 +10,10 @@
 
 // Cantera includes
 #include "GasTransport.h"
-#include "cantera/numerics/DenseMatrix.h"
+#include "cantera/numerics/SquareMatrix.h"
 
 namespace Cantera
 {
-
-class GasTransportParams;
-
 //! Class MultiTransport implements multicomponent transport properties for
 //! ideal gas mixtures.
 /*!
@@ -167,6 +164,7 @@ public:
     vector_fp   m_eps;
     vector_fp   m_sigma;
     vector_fp   m_alpha;
+    vector_fp   m_w_ac;
     DenseMatrix   m_dipole;
 
 protected:
@@ -179,7 +177,7 @@ protected:
 
     // L matrix quantities
     DenseMatrix  m_Lmatrix;
-    DenseMatrix m_aa;
+    SquareMatrix m_aa;
     //DenseMatrix m_Lmatrix;
     vector_fp m_a;
     vector_fp m_b;

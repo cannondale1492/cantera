@@ -11,12 +11,12 @@
  * U.S. Government retains certain rights in this software.
  */
 
-#include "cantera/base/ct_defs.h"
 #include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/FixedChemPotSSTP.h"
-#include "cantera/thermo/SpeciesThermo.h"
 #include "cantera/thermo/ThermoFactory.h"
 #include "cantera/thermo/SimpleThermo.h"
+#include "cantera/base/ctml.h"
+
 namespace Cantera
 {
 /*
@@ -85,20 +85,17 @@ FixedChemPotSSTP::FixedChemPotSSTP(const std::string& Ename, doublereal val) :
     setID(pname);
     setName(pname);
     setNDim(3);
-    addUniqueElement(Ename, -12345.);
-    freezeElements();
+    addElement(Ename);
     vector_fp ecomp(nElements(), 0.0);
     ecomp[0] = 1.0;
     double chrg = 0.0;
-    SpeciesThermo* spth = new SimpleThermo();
-    setSpeciesThermo(spth);
     addUniqueSpecies(pname, &ecomp[0], chrg, 0.0);
     double c[4];
     c[0] = 298.15;
     c[1] = val;
     c[2] = 0.0;
     c[3] = 0.0;
-    m_spthermo->install(pname, 0, SIMPLE, c, 0.0, 1.0E30, OneAtm);
+    m_spthermo->install(pname, 0, SIMPLE, c, 0.1, 1.0E30, OneAtm);
     initThermo();
     m_p0 = OneAtm;
     m_tlast = 298.15;
@@ -127,7 +124,7 @@ FixedChemPotSSTP::FixedChemPotSSTP(const std::string& Ename, doublereal val) :
 FixedChemPotSSTP::FixedChemPotSSTP(const FixedChemPotSSTP&  right) :
     SingleSpeciesTP()
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 FixedChemPotSSTP&
@@ -198,8 +195,8 @@ doublereal FixedChemPotSSTP::logStandardConc(size_t k) const
     return 0.0;
 }
 
-void FixedChemPotSSTP::
-getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
+void FixedChemPotSSTP::getUnitsStandardConc(doublereal* uA, int k, 
+                                            int sizeUA) const
 {
     for (int i = 0; i < 6; i++) {
         uA[i] = 0;
@@ -295,14 +292,6 @@ void FixedChemPotSSTP::getCp_R_ref(doublereal* cpr) const
 /*
  * ---- Initialization and Internal functions
  */
-
-void FixedChemPotSSTP::initThermo()
-{
-    /*
-     * Call the base class thermo initializer
-     */
-    SingleSpeciesTP::initThermo();
-}
 
 void FixedChemPotSSTP::initThermoXML(XML_Node& phaseNode, const std::string& id_)
 {

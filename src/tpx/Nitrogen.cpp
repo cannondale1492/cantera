@@ -12,7 +12,6 @@ static const double M  = 28.01348,
                     Tc = 126.200,
                     Pc = 3.4e6,
                     Roc = 314.03,
-                    To = 63.15,
                     R = 2.96790515164171e2,
                     Gamma = 7.13602531283233e-6,
                     alpha = 1.95,
@@ -247,14 +246,6 @@ double nitrogen::Tmin()
 double nitrogen::Tmax()
 {
     return Tmx;
-}
-char* nitrogen::name()
-{
-    return (char*) m_name.c_str();
-}
-char* nitrogen::formula()
-{
-    return (char*) m_formula.c_str();
 }
 double nitrogen::MolWt()
 {

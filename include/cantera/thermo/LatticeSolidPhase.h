@@ -11,13 +11,8 @@
 #ifndef CT_LATTICESOLID_H
 #define CT_LATTICESOLID_H
 
-#include "cantera/base/config.h"
-#include "cantera/base/ct_defs.h"
-#include "mix_defs.h"
 #include "ThermoPhase.h"
-#include "SpeciesThermo.h"
 #include "LatticePhase.h"
-#include "cantera/base/utilities.h"
 
 namespace Cantera
 {
@@ -338,7 +333,7 @@ public:
      *   @param k species index
      */
     doublereal moleFraction(const int k) const {
-        return err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::moleFraction");
     }
 
     //! Get the species mass fractions.
@@ -347,7 +342,7 @@ public:
      *          greater than or equal to the number of species.
      */
     void getMassFractions(doublereal* const y) const {
-        err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::getMassFractions");
     }
 
     //! Mass fraction of species k.
@@ -358,7 +353,7 @@ public:
      * @param k    species index
      */
     doublereal massFraction(const int k) const {
-        return err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::massFraction");
     }
 
     //! Set the mass fractions to the specified values, and then
@@ -373,7 +368,7 @@ public:
      *           Length is m_kk.
      */
     virtual void setMassFractions(const doublereal* const y) {
-        err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::setMassFractions");
     }
 
     //! Set the mass fractions to the specified values without normalizing.
@@ -386,19 +381,19 @@ public:
      *           Length is m_kk.
      */
     virtual void setMassFractions_NoNorm(const doublereal* const y) {
-        err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::setMassFractions_NoNorm");
     }
 
     void getConcentrations(doublereal* const c) const {
-        err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::getConcentrations");
     }
 
     doublereal concentration(int k) const {
-        return err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::concentration");
     }
 
     virtual void setConcentrations(const doublereal* const conc) {
-        err("not implemented");
+        throw NotImplementedError("LatticeSolidPhase::setConcentrations");
     }
 
     //! This method returns an array of generalized activity concentrations
@@ -586,8 +581,6 @@ public:
      * description, this method is called from ThermoPhase::initThermoXML(),
      * which is called from importPhase(),
      * just prior to returning from function importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
@@ -604,9 +597,8 @@ public:
 
     //! Set equation of state parameter values from XML entries.
     /*!
-     * This method is called by function importPhase() in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
+     * This method is called by function importPhase() when processing a phase
+     * definition in an input file. It should be overloaded in subclasses to set
      * any parameters that are specific to that particular phase
      * model. Note, this method is called before the phase is
      * initialized with elements and/or species.
@@ -632,21 +624,9 @@ public:
      *   @param  k           Species k
      *   @param  Hf298New    Specify the new value of the Heat of Formation at 298K and 1 bar
      */
-    virtual void modifyOneHf298SS(const size_t& k, const doublereal Hf298New);
-
-private:
-    //! error routine
-    /*!
-     *  @param msg Message
-     *
-     *  @return nothing
-     */
-    doublereal err(const std::string& msg) const;
+    virtual void modifyOneHf298SS(const size_t k, const doublereal Hf298New);
 
 protected:
-    //! Last temperature at which the reference thermo was calculated
-    mutable doublereal  m_tlast;
-
     //! Current value of the pressure
     doublereal m_press;
 

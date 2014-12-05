@@ -85,20 +85,25 @@ void popError();
  *
  * There are two different types of input files within %Cantera:
  *  - ctml: This is an xml file laid out in such a way that %Cantera can
- *          interpret the contents.
- *  - cti:  A human-readable ascii format for information that %Cantera
- *          will read.
+ *          interpret the contents. This is the essential input file within
+ *          Cantera, and contains all elements that are involved with simulation,
+ *          error propagation, data support, and versioning.
  *
- * %Cantera can take its input from both types of files. However, given a file
- * in cti format, the initial operation that %Cantera will perform is to
- * translate the cti file into a ctml file. The translation is carried out via
- * a system call to a python interpreter program that actually carries out the
- * translation. In general, a new ctml file is created by the translation that
- * is written to the current local directory. The ctml file is then read back
- * into %Cantera as the input.
+ *  - cti:  A human-readable input file written using Python syntax which
+ *    defines species and phases, and contains thermodynamic, chemical kinetic,
+ *    and transport data needed by %Cantera. Some options and equations of state
+ *    available in the CTML format have not yet been implemented for the CTI
+ *    format. %Cantera provides a converter (ck2cti) for converting Chemkin-
+ *    format gas-phase mechanisms to the CTI format.
+ *
+ * Internally, %Cantera works with the CTML file. Given a file in CTI format,
+ * %Cantera will convert the CTI file into the CTML format on-the-fly using a
+ * Python script (ctml_writer). This process is done in-memory without writing
+ * any new files to disk.
  *
  * Other input routines in other modules:
  *   @see importKinetics()
+ *
  * @{
  */
 
@@ -171,6 +176,9 @@ void writelogf(const char* fmt,...);
 //! Write an end of line character to the screen and flush output
 void writelogendl();
 
+void writeline(char repeat, size_t count,
+               bool endl_after=true, bool endl_before=false);
+
 //! @copydoc Application::Messages::logerror
 void error(const std::string& msg);
 
@@ -199,6 +207,9 @@ doublereal actEnergyToSI(const std::string& unit);
 
 //! @copydoc Application::get_XML_File
 XML_Node* get_XML_File(const std::string& file, int debug = 0);
+
+//! @copydoc Application::get_XML_from_string
+XML_Node* get_XML_from_string(const std::string& text);
 
 //! @copydoc Application::close_XML_File
 void close_XML_File(const std::string& file);
@@ -266,6 +277,11 @@ template <class T>
 inline T clip(const T& value, const T& lower, const T& upper)
 {
     return std::max(lower, std::min(upper, value));
+}
+
+//! Sign of a number. Returns -1 if x < 0, 1 if x > 0 and 0 if x == 0.
+template <typename T> int sign(T x) {
+    return (T(0) < x) - (x < T(0));
 }
 
 }

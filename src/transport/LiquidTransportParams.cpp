@@ -4,8 +4,6 @@
  */
 
 #include "cantera/transport/LiquidTransportParams.h"
-#include "cantera/thermo/IonsFromNeutralVPSSTP.h"
-#include "cantera/thermo/MargulesVPSSTP.h"
 using namespace std;
 
 namespace Cantera
@@ -32,7 +30,8 @@ LiquidTransportParams::LiquidTransportParams() :
     hydroRadius(0),
     model_viscosity(LTI_MODEL_NOTSET),
     model_speciesDiffusivity(LTI_MODEL_NOTSET),
-    model_hydroradius(LTI_MODEL_NOTSET)
+    model_hydroradius(LTI_MODEL_NOTSET),
+    compositionDepTypeDefault_(LTI_MODEL_NOTSET)
 {
 }
 
@@ -56,7 +55,8 @@ LiquidTransportParams::LiquidTransportParams(const LiquidTransportParams& right)
     hydroRadius(0),
     model_viscosity(LTI_MODEL_NOTSET),
     model_speciesDiffusivity(LTI_MODEL_NOTSET),
-    model_hydroradius(LTI_MODEL_NOTSET)
+    model_hydroradius(LTI_MODEL_NOTSET),
+    compositionDepTypeDefault_(LTI_MODEL_NOTSET)
 {
     operator=(right);
 }
@@ -106,6 +106,7 @@ LiquidTransportParams&  LiquidTransportParams::operator=(const LiquidTransportPa
     diff_Dij = right.diff_Dij;
     model_hydroradius = right.model_hydroradius;
     radius_Aij = right.radius_Aij;
+    compositionDepTypeDefault_ = right.compositionDepTypeDefault_;
 
     throw CanteraError("LiquidTransportParams(const LiquidTransportParams &right)", "not tested");
 

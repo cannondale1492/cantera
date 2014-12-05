@@ -17,13 +17,13 @@
 #include "cantera/thermo/SpeciesThermoFactory.h"
 #include "cantera/thermo/PDSS.h"
 #include "cantera/thermo/GeneralSpeciesThermo.h"
+#include "cantera/base/vec_functions.h"
+#include "cantera/base/xml.h"
 
 using namespace std;
 
 namespace Cantera
 {
-class SpeciesThermo;
-
 VPSSMgr::VPSSMgr(VPStandardStateTP* vptp_ptr, SpeciesThermo* spthermo) :
     m_kk(0),
     m_vptp_ptr(vptp_ptr),
@@ -50,8 +50,6 @@ VPSSMgr::VPSSMgr(const VPSSMgr& right) :
     m_kk(0),
     m_vptp_ptr(0),
     m_spthermo(0),
-    //  m_Tnow(300.),
-    //   m_Pnow(OneAtm),
     m_tlast(-1.0),
     m_plast(-1.0),
     m_p0(-1.0),
@@ -155,7 +153,7 @@ VPSSMgr::getStandardChemPotentials(doublereal* mu) const
         doublereal _rt = GasConstant * m_tlast;
         scale(mu, mu+m_kk, mu, _rt);
     } else {
-        err("getStandardChemPotentials");
+        throw NotImplementedError("VPSSMgr::getStandardChemPotentials");
     }
 }
 
@@ -165,7 +163,7 @@ VPSSMgr::getGibbs_RT(doublereal* grt) const
     if (m_useTmpStandardStateStorage) {
         std::copy(m_gss_RT.begin(), m_gss_RT.end(), grt);
     } else {
-        err("getGibbs_RT");
+        throw NotImplementedError("VPSSMgr::getGibbs_RT");
     }
 }
 
@@ -175,7 +173,7 @@ VPSSMgr::getEnthalpy_RT(doublereal* hrt) const
     if (m_useTmpStandardStateStorage) {
         std::copy(m_hss_RT.begin(), m_hss_RT.end(), hrt);
     } else {
-        err("getEnthalpy_RT");
+        throw NotImplementedError("VPSSMgr::getEnthalpy_RT");
     }
 }
 
@@ -185,7 +183,7 @@ VPSSMgr::getEntropy_R(doublereal* sr) const
     if (m_useTmpStandardStateStorage) {
         std::copy(m_sss_R.begin(), m_sss_R.end(), sr);
     } else {
-        err("getEntropy_RT");
+        throw NotImplementedError("VPSSMgr::getEntropy_RT");
     }
 }
 
@@ -199,7 +197,7 @@ VPSSMgr::getIntEnergy_RT(doublereal* urt) const
             urt[k] -= pRT * m_Vss[k];
         }
     } else {
-        err("getEntropy_RT");
+        throw NotImplementedError("VPSSMgr::getEntropy_RT");
     }
 }
 
@@ -209,7 +207,7 @@ VPSSMgr::getCp_R(doublereal* cpr) const
     if (m_useTmpStandardStateStorage) {
         std::copy(m_cpss_R.begin(), m_cpss_R.end(), cpr);
     } else {
-        err("getCp_R");
+        throw NotImplementedError("VPSSMgr::getCp_R");
     }
 }
 
@@ -219,14 +217,14 @@ VPSSMgr::getStandardVolumes(doublereal* vol) const
     if (m_useTmpStandardStateStorage) {
         std::copy(m_Vss.begin(), m_Vss.end(), vol);
     } else {
-        err("getStandardVolumes");
+        throw NotImplementedError("VPSSMgr::getStandardVolumes");
     }
 }
 const vector_fp&
 VPSSMgr::getStandardVolumes() const
 {
     if (!m_useTmpStandardStateStorage) {
-        err("getStandardVolumes");
+        throw NotImplementedError("VPSSMgr::getStandardVolumes");
     }
     return m_Vss;
 }
@@ -238,7 +236,7 @@ VPSSMgr::getEnthalpy_RT_ref(doublereal* hrt) const
     if (m_useTmpRefStateStorage) {
         std::copy(m_h0_RT.begin(), m_h0_RT.end(), hrt);
     } else {
-        err("getEnthalpy_RT_ref");
+        throw NotImplementedError("VPSSMgr::getEnthalpy_RT_ref");
     }
 }
 
@@ -248,7 +246,7 @@ VPSSMgr::getGibbs_RT_ref(doublereal* grt) const
     if (m_useTmpRefStateStorage) {
         std::copy(m_g0_RT.begin(), m_g0_RT.end(), grt);
     } else {
-        err("getGibbs_RT_ref");
+        throw NotImplementedError("VPSSMgr::getGibbs_RT_ref");
     }
 }
 
@@ -260,7 +258,7 @@ VPSSMgr::getGibbs_ref(doublereal* g) const
         doublereal _rt = GasConstant * m_tlast;
         scale(g, g+m_kk, g, _rt);
     } else {
-        err("getGibbs_ref");
+        throw NotImplementedError("VPSSMgr::getGibbs_ref");
     }
 }
 
@@ -270,7 +268,7 @@ VPSSMgr::getEntropy_R_ref(doublereal* sr) const
     if (m_useTmpRefStateStorage) {
         std::copy(m_s0_R.begin(), m_s0_R.end(), sr);
     } else {
-        err("getEntropy_R_ref");
+        throw NotImplementedError("VPSSMgr::getEntropy_R_ref");
     }
 }
 
@@ -280,7 +278,7 @@ VPSSMgr::getCp_R_ref(doublereal* cpr) const
     if (m_useTmpRefStateStorage) {
         std::copy(m_cp0_R.begin(), m_cp0_R.end(), cpr);
     } else {
-        err("getCp_R_ref");
+        throw NotImplementedError("VPSSMgr::getCp_R_ref");
     }
 }
 
@@ -339,7 +337,7 @@ void VPSSMgr::_updateStandardStateThermo()
         PDSS* kPDSS = m_vptp_ptr->providePDSS(k);
         kPDSS->setState_TP(m_tlast, m_plast);
     }
-    err("_updateStandardStateThermo()");
+    throw NotImplementedError("VPSSMgr::_updateStandardStateThermo()");
 }
 
 void VPSSMgr::_updateRefStateThermo() const
@@ -395,53 +393,18 @@ void VPSSMgr::initThermoXML(XML_Node& phaseNode, const std::string& id)
     m_p0 = kPDSS->refPressure();
     for (size_t i = 0; i < m_kk; i++) {
         const PDSS* kPDSS = m_vptp_ptr->providePDSS(i);
-        doublereal mint = kPDSS->minTemp();
-        if (mint > m_minTemp) {
-            m_minTemp = mint;
-        }
-        mint = kPDSS->maxTemp();
-        if (mint < m_maxTemp) {
-            m_maxTemp = mint;
-        }
+        m_minTemp = std::max(m_minTemp, kPDSS->minTemp());
+        m_maxTemp = std::min(m_maxTemp, kPDSS->maxTemp());
     }
-#ifdef DEBUG_MODE
-    // Add a check to see that all references pressures are the same
-    double m_p0_k;
-    if (m_spthermo) {
-        for (size_t k = 0; k < m_kk; k++) {
-            m_p0_k = m_spthermo->refPressure(k);
-            if (m_p0 != m_p0_k) {
-                //throw CanteraError("VPSSMgr::initThermoXML",
-                //    "inconsistent ref pressures" + fp2str(m_p0) + " "
-                //    + fp2str(m_p0_k));
-                // writelog("VPSSMgr::initThermoXML:"
-                //    "inconsistent ref pressures: " + fp2str(m_p0) + " "
-                //    + fp2str(m_p0_k) + " for SpeciesThermo k = " + int2str(k) + "\n");
-            }
-        }
-    }
-
-    for (size_t k = 0; k < m_kk; k++) {
-        const PDSS* kPDSS = m_vptp_ptr->providePDSS(k);
-        m_p0_k = kPDSS->refPressure();
-        if (m_p0 != m_p0_k) {
-            //throw CanteraError("VPSSMgr::initThermoXML",
-            //    "inconsistent ref pressures" + fp2str(m_p0) + " "
-            //    + fp2str(m_p0_k));
-            //writelog("VPSSMgr::initThermoXML"
-            //    "inconsistent ref pressures: " + fp2str(m_p0) + " "
-            //    + fp2str(m_p0_k) + " for PDSS k = " + int2str(k) + "\n");
-        }
-    }
-#endif
 }
 
 void VPSSMgr::installSTSpecies(size_t k,  const XML_Node& s,
                                const XML_Node* phaseNode_ptr)
 {
-
-    SpeciesThermoFactory*  f = SpeciesThermoFactory::factory();
-    f->installThermoForSpecies(k, s, m_vptp_ptr, *m_spthermo, phaseNode_ptr);
+    SpeciesThermoInterpType* stit = newSpeciesThermoInterpType(s);
+    stit->setIndex(k);
+    stit->validate(s["name"]);
+    m_spthermo->install_STIT(stit);
     if (m_p0 < 0.0) {
         m_p0 = m_spthermo->refPressure(k);
     }
@@ -450,8 +413,7 @@ void VPSSMgr::installSTSpecies(size_t k,  const XML_Node& s,
 PDSS* VPSSMgr::createInstallPDSS(size_t k, const XML_Node& s,
                                  const XML_Node* phaseNode_ptr)
 {
-    err("VPSSMgr::createInstallPDSS");
-    return (PDSS*) 0;
+    throw NotImplementedError("VPSSMgr::VPSSMgr::createInstallPDSS");
 }
 
 /*****************************************************************/
@@ -484,21 +446,13 @@ doublereal VPSSMgr::refPressure(size_t k) const
 
 PDSS_enumType VPSSMgr::reportPDSSType(int index) const
 {
-    err("reportPDSSType()");
-    return cPDSS_UNDEF;
+    throw NotImplementedError("VPSSMgr::reportPDSSType()");
 }
 
 
 VPSSMgr_enumType VPSSMgr::reportVPSSMgrType() const
 {
-    err("reportVPSSType()");
-    return cVPSSMGR_UNDEF;
+    throw NotImplementedError("VPSSMgr::reportVPSSType()");
 }
 
-/*****************************************************************/
-
-void VPSSMgr::err(const std::string& msg) const
-{
-    throw CanteraError("VPSSMgr::" + msg, "unimplemented");
-}
 }

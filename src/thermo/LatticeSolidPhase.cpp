@@ -6,21 +6,18 @@
  *  (see \ref thermoprops and class \link Cantera::LatticeSolidPhase LatticeSolidPhase\endlink).
  */
 
-#include "cantera/base/ct_defs.h"
-#include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/LatticeSolidPhase.h"
-#include "cantera/thermo/LatticePhase.h"
-#include "cantera/thermo/SpeciesThermo.h"
 #include "cantera/thermo/ThermoFactory.h"
 #include "cantera/thermo/SpeciesThermoFactory.h"
 #include "cantera/thermo/GeneralSpeciesThermo.h"
+#include "cantera/base/ctml.h"
+#include "cantera/base/utilities.h"
 
 using namespace std;
 
 namespace Cantera
 {
 LatticeSolidPhase::LatticeSolidPhase() :
-    m_tlast(0.0),
     m_press(-1.0),
     m_molar_density(0.0),
     m_nlattice(0),
@@ -32,7 +29,6 @@ LatticeSolidPhase::LatticeSolidPhase() :
 }
 
 LatticeSolidPhase::LatticeSolidPhase(const LatticeSolidPhase& right) :
-    m_tlast(0.0),
     m_press(-1.0),
     m_molar_density(0.0),
     m_nlattice(0),
@@ -41,7 +37,7 @@ LatticeSolidPhase::LatticeSolidPhase(const LatticeSolidPhase& right) :
     theta_(0),
     tmpV_(0)
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 LatticeSolidPhase&
@@ -244,15 +240,15 @@ void LatticeSolidPhase::getMoleFractions(doublereal* const x) const
          * At this point we can check against the mole fraction vector of the underlying LatticePhase objects and
          * get the same answer.
          */
-#ifdef DEBUG_MODE
-        m_lattice[n]->getMoleFractions(&(m_x[strt]));
-        for (size_t k = 0; k < nsp; k++) {
-            if (fabs((x + strt)[k] - m_x[strt+k]) > 1.0E-14) {
-                throw CanteraError("LatticeSolidPhase::getMoleFractions()",
-                                   "internal error");
+        if (DEBUG_MODE_ENABLED) {
+            m_lattice[n]->getMoleFractions(&(m_x[strt]));
+            for (size_t k = 0; k < nsp; k++) {
+                if (fabs((x + strt)[k] - m_x[strt+k]) > 1.0E-14) {
+                    throw CanteraError("LatticeSolidPhase::getMoleFractions()",
+                                       "internal error");
+                }
             }
         }
-#endif
         strt += nsp;
     }
 }
@@ -342,18 +338,13 @@ void LatticeSolidPhase::installSlavePhases(Cantera::XML_Node* phaseNode)
 {
     size_t kk = 0;
     size_t kstart = 0;
-    SpeciesThermoFactory* spFactory = SpeciesThermoFactory::factory();
-    SpeciesThermo* spthermo_ptr = new GeneralSpeciesThermo();
-    setSpeciesThermo(spthermo_ptr);
     m_speciesData.clear();
 
     XML_Node& eosdata = phaseNode->child("thermo");
     XML_Node& la = eosdata.child("LatticeArray");
-    std::vector<XML_Node*> lattices;
-    la.getChildren("phase",lattices);
+    std::vector<XML_Node*> lattices = la.getChildren("phase");
     for (size_t n = 0; n < m_nlattice; n++) {
         LatticePhase* lp = m_lattice[n];
-        XML_Node* phaseNode_ptr = lattices[n];
         size_t nsp =  lp->nSpecies();
         vector<doublereal> constArr(lp->nElements());
         const vector_fp& aws = lp->atomicWeights();
@@ -363,7 +354,7 @@ void LatticeSolidPhase::installSlavePhases(Cantera::XML_Node* phaseNode)
             int an = lp->atomicNumber(es);
             int e298 = lp->entropyElement298(es); //! @todo Why is this an int instead of a double?
             int et = lp->elementType(es);
-            addUniqueElementAfterFreeze(esName, wt, an, e298, et);
+            addElement(esName, wt, an, e298, et);
         }
         const std::vector<const XML_Node*> & spNode =  lp->speciesData();
         kstart = kk;
@@ -380,7 +371,8 @@ void LatticeSolidPhase::installSlavePhases(Cantera::XML_Node* phaseNode)
                     std::string oldEname = lp->elementName(m);
                     size_t newIndex = elementIndex(oldEname);
                     if (newIndex == npos) {
-                        throw CanteraError("LatticeSolidPhase::installSlavePhases", "confused");
+                        throw CanteraError("LatticeSolidPhase::installSlavePhases",
+                                           "element not found");
                     }
                     ecomp[newIndex] = constArr[m];
                 }
@@ -388,8 +380,10 @@ void LatticeSolidPhase::installSlavePhases(Cantera::XML_Node* phaseNode)
             double chrg = lp->charge(k);
             double sz = lp->size(k);
             addUniqueSpecies(sname, &ecomp[0], chrg, sz);
-            spFactory->installThermoForSpecies(kk, *(spNode[k]), this, *m_spthermo, phaseNode_ptr);
-
+            SpeciesThermoInterpType* stit = newSpeciesThermoInterpType(*spNode[k]);
+            stit->setIndex(kk);
+            stit->validate(spNode[k]->attrib("name"));
+            m_spthermo->install_STIT(stit);
             m_speciesData.push_back(new XML_Node(*(spNode[k])));
             kk++;
         }
@@ -400,7 +394,7 @@ void LatticeSolidPhase::installSlavePhases(Cantera::XML_Node* phaseNode)
             string econ = "LC_";
             econ += int2str(n);
             econ += "_" + id();
-            size_t m = addUniqueElementAfterFreeze(econ, 0.0, 0, 0.0, CT_ELEM_TYPE_LATTICERATIO);
+            size_t m = addElement(econ, 0.0, 0, 0.0, CT_ELEM_TYPE_LATTICERATIO);
             size_t mm = nElements();
             LatticePhase* lp0 = m_lattice[0];
             size_t nsp0 =  lp0->nSpecies();
@@ -443,10 +437,6 @@ void LatticeSolidPhase::initLengths()
 void LatticeSolidPhase::_updateThermo() const
 {
     doublereal tnow = temperature();
-    //        if (fabs(molarDensity() - m_molar_density)/m_molar_density > 0.0001) {
-    //   throw CanteraError("_updateThermo","molar density changed from "
-    //        +fp2str(m_molar_density)+" to "+fp2str(molarDensity()));
-    //}
     if (m_tlast != tnow) {
         getMoleFractions(DATA_PTR(m_x));
         size_t strt = 0;
@@ -480,8 +470,7 @@ void LatticeSolidPhase::setParametersFromXML(const XML_Node& eosdata)
 {
     eosdata._require("model","LatticeSolid");
     XML_Node& la = eosdata.child("LatticeArray");
-    std::vector<XML_Node*> lattices;
-    la.getChildren("phase",lattices);
+    std::vector<XML_Node*> lattices = la.getChildren("phase");
     size_t nl = lattices.size();
     m_nlattice = nl;
     for (size_t n = 0; n < nl; n++) {
@@ -512,7 +501,7 @@ void LatticeSolidPhase::setParametersFromXML(const XML_Node& eosdata)
 
 }
 
-void LatticeSolidPhase::modifyOneHf298SS(const size_t& k, const doublereal Hf298New)
+void LatticeSolidPhase::modifyOneHf298SS(const size_t k, const doublereal Hf298New)
 {
     for (size_t n = 0; n < m_nlattice; n++) {
         if (lkstart_[n+1] < k) {
@@ -523,12 +512,6 @@ void LatticeSolidPhase::modifyOneHf298SS(const size_t& k, const doublereal Hf298
     }
     m_tlast += 0.0001234;
     _updateThermo();
-}
-
-doublereal LatticeSolidPhase::err(const std::string& msg) const
-{
-    throw CanteraError("LatticeSolidPhase","Unimplemented " + msg);
-    return 0.0;
 }
 
 } // End namespace Cantera

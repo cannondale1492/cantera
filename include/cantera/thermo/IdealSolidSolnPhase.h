@@ -15,10 +15,7 @@
 #ifndef CT_IDEALSOLIDSOLNPHASE_H
 #define CT_IDEALSOLIDSOLNPHASE_H
 
-#include "mix_defs.h"
 #include "ThermoPhase.h"
-#include "ThermoFactory.h"
-#include "SpeciesThermo.h"
 
 namespace Cantera
 {
@@ -132,23 +129,6 @@ public:
      * @see SpeciesThermo
      */
     virtual doublereal enthalpy_mole() const;
-
-    /**
-     * Molar internal energy of the solution. Units: J/kmol.
-     * For an ideal, constant partial molar volume solution mixture with
-     * pure species phases which exhibit zero volume expansivity and
-     * zero isothermal compressibility:
-     * \f[
-     * \hat u(T,X) = \hat h(T,P,X) - p \hat V
-     *         =  \sum_k X_k \hat h^0_k(T)  - P_{ref} (\sum_k{X_k \hat V^0_k})
-     * \f]
-     * and is a function only of temperature.
-     * The reference-state pure-species enthalpies
-     * \f$ \hat h^0_k(T) \f$ are computed by the species thermodynamic
-     * property manager.
-     * @see SpeciesThermo
-     */
-    virtual doublereal intEnergy_mole() const;
 
     /**
      * Molar entropy of the solution. Units: J/kmol/K.
@@ -812,13 +792,6 @@ public:
     //@{
 
     /**
-     *  Initialization of an IdealSolidSolnPhase phase:
-     *  Note this function is pretty much useless because it doesn't
-     *  get the xml tree passed to it. Suggest a change.
-     */
-    virtual void initThermo();
-
-    /**
       * @internal Import and initialize a ThermoPhase object using an XML
       *   tree. Here we read extra information about the XML description of a
       *   phase. Regular information about elements and species and their
@@ -906,12 +879,6 @@ protected:
      * Species molar volumes \f$ m^3 kmol^-1 \f$
      */
     vector_fp   m_speciesMolarVolume;
-
-    /**
-     *  Value of the temperature at which the thermodynamics functions
-     * for the reference state of the species were last evaluated.
-     */
-    mutable doublereal   m_tlast;
 
     //! Vector containing the species reference enthalpies at T = m_tlast
     mutable vector_fp      m_h0_RT;

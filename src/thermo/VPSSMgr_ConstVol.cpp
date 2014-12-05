@@ -13,10 +13,9 @@
  */
 
 #include "cantera/thermo/VPSSMgr_ConstVol.h"
-#include "cantera/base/xml.h"
 #include "cantera/thermo/VPStandardStateTP.h"
-#include "cantera/thermo/SpeciesThermoFactory.h"
 #include "cantera/thermo/PDSS_ConstVol.h"
+#include "cantera/base/ctml.h"
 
 using namespace std;
 
@@ -116,12 +115,12 @@ VPSSMgr_ConstVol::initThermoXML(XML_Node& phaseNode, const std::string& id)
         const XML_Node* ss = s->findByName("standardState");
         if (!ss) {
             throw CanteraError("VPSSMgr_ConstVol::initThermoXML",
-                               "no standardState Node for species " + s->name());
+                               "no standardState Node for species " + s->attrib("name"));
         }
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "constant_incompressible" && model != "constantVolume") {
             throw CanteraError("VPSSMgr_ConstVol::initThermoXML",
-                               "standardState model for species isn't constant_incompressible: " + s->name());
+                               "standardState model for species isn't constant_incompressible: " + s->attrib("name"));
         }
         m_Vss[k] = ctml::getFloat(*ss, "molarVolume", "toSI");
     }
@@ -131,17 +130,16 @@ PDSS*
 VPSSMgr_ConstVol::createInstallPDSS(size_t k, const XML_Node& speciesNode,
                                     const XML_Node* const phaseNode_ptr)
 {
-    //VPSSMgr::installSpecies(k, speciesNode, phaseNode_ptr);
     const XML_Node* ss = speciesNode.findByName("standardState");
     if (!ss) {
-        throw CanteraError("VPSSMgr_ConstVol::installSpecies",
-                           "no standardState Node for species " + speciesNode.name());
+        throw CanteraError("VPSSMgr_ConstVol::createInstallPDSS",
+                           "no standardState Node for species " + speciesNode["name"]);
     }
-    std::string model = (*ss)["model"];
+    std::string model = ss->attrib("model");
     if (model != "constant_incompressible" && model != "constantVolume") {
-        throw CanteraError("VPSSMgr_ConstVol::initThermoXML",
+        throw CanteraError("VPSSMgr_ConstVol::createInstallPDSS",
                            "standardState model for species isn't "
-                           "constant_incompressible: " + speciesNode.name());
+                           "constant_incompressible: " + speciesNode["name"]);
     }
     if (m_Vss.size() < k+1) {
         m_Vss.resize(k+1, 0.0);

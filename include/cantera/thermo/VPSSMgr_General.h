@@ -15,17 +15,10 @@
 #ifndef CT_VPSSMGR_GENERAL_H
 #define CT_VPSSMGR_GENERAL_H
 
-#include "cantera/base/ct_defs.h"
 #include "VPSSMgr.h"
 
 namespace Cantera
 {
-
-class SpeciesThermoInterpType;
-class VPStandardStateTP;
-class SpeciesThermo;
-class PDSS;
-
 //!  Class that handles the calculation of standard state thermo properties for
 //!  a set of species belonging to a single phase in a completely general
 //!  but slow way.
@@ -87,7 +80,7 @@ protected:
      * The following methods are used in the process of constructing the phase
      * and setting its parameters from a specification in an input file. They
      * are not normally used in application programs. To see how they are
-     * used, see files importCTML.cpp and ThermoFactory.cpp.
+     * used, see #importPhase.
      */
     //@{
     virtual void initThermo();

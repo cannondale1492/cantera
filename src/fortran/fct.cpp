@@ -7,7 +7,6 @@
  *   pointers are passed to or from the calling application.
  */
 // Cantera includes
-#include "cantera/equil/equil.h"
 #include "cantera/kinetics/KineticsFactory.h"
 #include "cantera/transport/TransportFactory.h"
 #include "cantera/thermo/ThermoFactory.h"
@@ -15,7 +14,6 @@
 #include "cantera/kinetics/importKinetics.h"
 #include "clib/Cabinet.h"
 #include "cantera/kinetics/InterfaceKinetics.h"
-#include "cantera/thermo/PureFluidPhase.h"
 
 #include "clib/clib_defs.h"
 
@@ -40,12 +38,7 @@ inline ThermoPhase* _fph(const integer* n)
 
 static Kinetics* _fkin(const integer* n)
 {
-    if (*n >= 0) {
-        return &KineticsCabinet::item(*n);
-    } else {
-        error("_fkin: negative kinetics index");
-        return &KineticsCabinet::item(0);
-    }
+    return &KineticsCabinet::item(*n);
 }
 
 inline ThermoPhase* _fth(const integer* n)
@@ -256,8 +249,7 @@ extern "C" {
     {
         try {
             ThermoPhase* p = _fph(n);
-            compositionMap xx = parseCompString(f2string(x, lx), p->speciesNames());
-            p->setMoleFractionsByName(xx);
+            p->setMoleFractionsByName(f2string(x, lx));
         } catch (...) {
             return handleAllExceptions(-1, ERR);
         }
@@ -283,8 +275,7 @@ extern "C" {
     {
         try {
             ThermoPhase* p = _fph(n);
-            compositionMap yy = parseCompString(f2string(y, leny), p->speciesNames());
-            p->setMassFractionsByName(yy);
+            p->setMassFractionsByName(f2string(y, leny));
         } catch (...) {
             return handleAllExceptions(-1, ERR);
         }
@@ -567,7 +558,7 @@ extern "C" {
     status_t th_equil_(const integer* n, char* XY, ftnlen lenxy)
     {
         try {
-            equilibrate(*_fth(n), f2string(XY,lenxy).c_str());
+            _fth(n)->equilibrate(f2string(XY,lenxy));
         } catch (...) {
             return handleAllExceptions(-1, ERR);
         }

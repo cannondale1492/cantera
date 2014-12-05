@@ -40,9 +40,6 @@ import numpy as np
 import re
 import itertools
 
-reFloat = re.compile(r'\+?\d*\.?\d+([eEdD][-+]?\d+)?$')
-reInt = re.compile(r'\+?\d+$')
-
 QUANTITY_UNITS = {'MOL': 'mol',
                   'MOLE': 'mol',
                   'MOLES': 'mol',
@@ -182,13 +179,14 @@ class NASA(ThermoModel):
 
     def to_cti(self, indent=0):
         prefix = ' '*indent
-        vals = ['{0: 15.8E}'.format(i) for i in self.coeffs]
         if len(self.coeffs) == 7:
+            vals = ['{0: 15.8E}'.format(i) for i in self.coeffs]
             lines = ['NASA([{0:.2f}, {1:.2f}],'.format(self.Tmin[0], self.Tmax[0]),
                      prefix+'     [{0}, {1}, {2},'.format(*vals[0:3]),
                      prefix+'      {0}, {1}, {2},'.format(*vals[3:6]),
                      prefix+'      {0}]),'.format(vals[6])]
         else:
+            vals = ['{0: 15.9E}'.format(i) for i in self.coeffs]
             lines = ['NASA9([{0:.2f}, {1:.2f}],'.format(self.Tmin[0], self.Tmax[0]),
                      prefix+'      [{0}, {1}, {2},'.format(*vals[0:3]),
                      prefix+'       {0}, {1}, {2},'.format(*vals[3:6]),
@@ -252,6 +250,7 @@ class Reaction(object):
         self.duplicate = duplicate
         self.fwdOrders = fwdOrders if fwdOrders is not None else {}
         self.thirdBody = thirdBody
+        self.comment = ''
 
     def _coeff_string(self, coeffs):
         L = []
@@ -860,6 +859,8 @@ class Parser(object):
         self.speciesList = []
         self.speciesDict = {}
         self.reactions = []
+        self.finalReactionComment = ''
+        self.headerLines = []
 
     def warn(self, message):
         if self.warning_as_error:
@@ -1086,12 +1087,16 @@ class Parser(object):
             j = reaction.find(token)
             i = len(token)
             reaction = reaction[:j] + ' '*i + reaction[j+i:]
-            if reInt.match(token):
+            if token == '+':
+                continue
+
+            try:
                 locs[j] = int(token), 'coeff'
-            elif reFloat.match(token):
-                locs[j] = float(token), 'coeff'
-            elif token != '+':
-                raise InputParseError('Unexpected token "{0}" in reaction expression "{1}".'.format(token, reaction))
+            except ValueError:
+                try:
+                    locs[j] = float(token), 'coeff'
+                except ValueError:
+                    raise InputParseError('Unexpected token "{0}" in reaction expression "{1}".'.format(token, reaction))
 
         reactants = []
         products = []
@@ -1268,23 +1273,24 @@ class Parser(object):
                 if chebyshev is None:
                     chebyshev = Chebyshev()
                 tokens = [t.strip() for t in tokens]
-                if 'TCHEB' in line:
-                    index = tokens.index('TCHEB')
+                if contains(tokens, 'TCHEB'):
+                    index = get_index(tokens, 'TCHEB')
                     tokens2 = tokens[index+1].split()
                     chebyshev.Tmin = float(tokens2[0].strip())
                     chebyshev.Tmax = float(tokens2[1].strip())
-                if 'PCHEB' in line:
-                    index = tokens.index('PCHEB')
+                if contains(tokens, 'PCHEB'):
+                    index = get_index(tokens, 'PCHEB')
                     tokens2 = tokens[index+1].split()
                     chebyshev.Pmin = (float(tokens2[0].strip()), 'atm')
                     chebyshev.Pmax = (float(tokens2[1].strip()), 'atm')
-                if 'TCHEB' in line or 'PCHEB' in line:
+                if contains(tokens, 'TCHEB') or contains(tokens, 'PCHEB'):
                     pass
                 elif chebyshev.degreeT == 0 or chebyshev.degreeP == 0:
                     tokens2 = tokens[1].split()
                     chebyshev.degreeT = int(float(tokens2[0].strip()))
                     chebyshev.degreeP = int(float(tokens2[1].strip()))
                     chebyshev.coeffs = np.zeros((chebyshev.degreeT,chebyshev.degreeP), np.float64)
+                    chebyshevCoeffs.extend([float(t.strip()) for t in tokens2[2:]])
                 else:
                     tokens2 = tokens[1].split()
                     chebyshevCoeffs.extend([float(t.strip()) for t in tokens2])
@@ -1356,9 +1362,9 @@ class Parser(object):
         """
 
         transportLines = []
+        self.line_number = 0
 
         with open(path, 'rU') as ck_file:
-            self.line_number = 0
 
             def readline():
                 self.line_number += 1
@@ -1372,10 +1378,14 @@ class Parser(object):
 
             line, comment = readline()
             advance = True
+            inHeader = True
             while line is not None:
                 tokens = line.split() or ['']
+                if inHeader and not line.strip():
+                    self.headerLines.append(comment.rstrip())
 
                 if tokens[0].upper().startswith('ELEM'):
+                    inHeader = False
                     tokens = tokens[1:]
                     while line is not None and not contains(line, 'END'):
                         # Grudging support for implicit end of section
@@ -1397,6 +1407,7 @@ class Parser(object):
                 elif tokens[0].upper().startswith('SPEC'):
                     # List of species identifiers
                     tokens = tokens[1:]
+                    inHeader = False
                     while line is not None and not contains(line, 'END'):
                         # Grudging support for implicit end of section
                         if (contains(line, 'REAC') or contains(line, 'TRAN') or
@@ -1427,6 +1438,7 @@ class Parser(object):
                             self.speciesList.append(species)
 
                 elif tokens[0].upper().startswith('THER') and contains(line, 'NASA9'):
+                    inHeader = False
                     entryPosition = 0
                     entryLength = None
                     entry = []
@@ -1484,6 +1496,7 @@ class Parser(object):
 
                 elif tokens[0].upper().startswith('THER'):
                     # List of thermodynamics (hopefully one per species!)
+                    inHeader = False
                     line, comment = readline()
                     if line is not None and not contains(line, 'END'):
                         TintDefault = float(line.split()[1])
@@ -1518,7 +1531,7 @@ class Parser(object):
 
                 elif tokens[0].upper().startswith('REAC'):
                     # Reactions section
-
+                    inHeader = False
                     for token in tokens[1:]:
                         units = token.upper()
                         if units in ENERGY_UNITS:
@@ -1556,7 +1569,7 @@ class Parser(object):
 
                         lineStartsWithComment = not line and comment
                         line = line.strip()
-                        comment = comment.strip()
+                        comment = comment.rstrip()
 
                         if '=' in line and not lineStartsWithComment:
                             # Finish previous record
@@ -1578,42 +1591,32 @@ class Parser(object):
                         kineticsList.append(kinetics)
                         commentsList.append(comments)
 
-                    if kineticsList[0] == '' and commentsList[-1] == '':
-                        # True for mechanism files generated from RMG-Py
+                    # We don't actually know whether comments belong to the
+                    # previous or next reaction, but to keep them positioned
+                    # correctly, we associate them with the next reaction (and
+                    # keep track of the final trailing comment separately)
+                    if kineticsList and kineticsList[0] == '':
                         kineticsList.pop(0)
-                        commentsList.pop(-1)
-                    elif kineticsList[0] == '' and commentsList[0] == '':
-                        # True for mechanism files generated from RMG-Java
-                        kineticsList.pop(0)
-                        commentsList.pop(0)
-                    else:
-                        # In reality, comments can occur anywhere in the mechanism
-                        # file (e.g. either or both of before and after the
-                        # reaction equation)
-                        # If we can't tell what semantics we are using, then just
-                        # throw the comments away
-                        # (This is better than failing to load the mechanism file at
-                        # all, which would likely occur otherwise)
-                        if kineticsList[0] == '':
-                            kineticsList.pop(0)
-                        if len(kineticsList) != len(commentsList):
-                            commentsList = ['' for kinetics in kineticsList]
+                        self.finalReactionComment = commentsList.pop()
 
                     self.setupKinetics()
-                    for kinetics, comments, line_number in zip(kineticsList, commentsList, startLines):
+                    for kinetics, comment, line_number in zip(kineticsList, commentsList, startLines):
                         try:
                             reaction,revReaction = self.readKineticsEntry(kinetics)
                         except Exception as e:
                             logging.error('Error reading reaction entry starting on line {0}:'.format(line_number))
                             raise
                         reaction.line_number = line_number
+                        reaction.comment = comment
                         self.reactions.append(reaction)
                         if revReaction is not None:
                             revReaction.line_number = line_number
                             self.reactions.append(revReaction)
 
                 elif tokens[0].upper().startswith('TRAN'):
+                    inHeader = False
                     line, comment = readline()
+                    transport_start_line = self.line_number
                     while line is not None and not contains(line, 'END'):
                         # Grudging support for implicit end of section
                         if contains(line, 'REAC'):
@@ -1642,7 +1645,7 @@ class Parser(object):
             reaction.index = index
 
         if transportLines:
-            self.parseTransportData(transportLines)
+            self.parseTransportData(transportLines, path, transport_start_line)
 
     def checkDuplicateReactions(self):
         """
@@ -1675,13 +1678,13 @@ class Parser(object):
                 else:
                     raise InputParseError(message.format(r1, r1.line_number, r2.line_number))
 
-    def parseTransportData(self, lines):
+    def parseTransportData(self, lines, filename, line_offset):
         """
         Parse the Chemkin-format transport data in ``lines`` (a list of strings)
         and add that transport data to the previously-loaded species.
         """
 
-        for line in lines:
+        for i,line in enumerate(lines):
             line = line.strip()
             if not line or line.startswith('!'):
                 continue
@@ -1694,7 +1697,9 @@ class Parser(object):
             else:
                 data = line.split()
             if len(data) < 7:
-                raise InputParseError('Unable to parse transport data: not enough parameters')
+                raise InputParseError('Unable to parse transport data: not'
+                    ' enough parameters on line {0} of "{1}".'.format(
+                        line_offset + i, filename))
 
             speciesName = data[0]
             if speciesName in self.speciesDict:
@@ -1702,7 +1707,8 @@ class Parser(object):
                     self.speciesDict[speciesName].transport = TransportData(*data)
                 else:
                     self.warn('Ignoring duplicate transport data'
-                         ' for species "{0}".'.format(speciesName))
+                         ' for species "{0} on line {1} of "{2}".'.format(
+                            speciesName, line_offset + i, filename))
 
     def writeCTI(self, header=None, name='gas', transportModel='Mix',
                  outName='mech.cti'):
@@ -1725,14 +1731,24 @@ class Parser(object):
             raise InputParseError('Undefined elements: ' + str(missingElements))
 
         speciesNames = ['']
+        speciesPerLine = max(int((80-21)/(speciesNameLength + 2)), 1)
+
         for i,s in enumerate(self.speciesList):
-            if i and not i % 5:
+            if i and not i % speciesPerLine:
                 speciesNames.append(' '*21)
             speciesNames[-1] += '{0:{1}s}'.format(s.label, speciesNameLength+2)
 
-        speciesNames = '\n'.join(speciesNames).strip()
+        speciesNames = '\n'.join(line.rstrip() for line in speciesNames)
 
         lines = []
+
+        # Original header
+        if self.headerLines:
+            lines.append('"""')
+            lines.extend(self.headerLines)
+            lines.extend(('"""', ''))
+
+        # Cantera-generated header
         if header:
             lines.extend(header)
 
@@ -1758,16 +1774,21 @@ class Parser(object):
         for s in self.speciesList:
             lines.append(s.to_cti())
 
-        # Write the reactions
-        lines.append(delimiterLine)
-        lines.append('# Reaction data')
-        lines.append(delimiterLine)
+        if self.reactions:
+            # Write the reactions
+            lines.append(delimiterLine)
+            lines.append('# Reaction data')
+            lines.append(delimiterLine)
 
-        for i,r in enumerate(self.reactions):
-            lines.append('\n# Reaction {0}'.format(i+1))
-            lines.append(r.to_cti())
+            for i,r in enumerate(self.reactions):
+                lines.extend('# '+c for c in r.comment.split('\n') if c)
+                lines.append('\n# Reaction {0}'.format(i+1))
+                lines.append(r.to_cti())
 
-        lines.append('')
+            # Comment after the last reaction
+            lines.extend('# '+c for c in self.finalReactionComment.split('\n') if c)
+
+            lines.append('')
 
         f = open(outName, 'w')
         f.write('\n'.join(lines))
@@ -1799,6 +1820,14 @@ duplicate transport data) to be ignored.
     def convertMech(self, inputFile, thermoFile=None,
                     transportFile=None, phaseName='gas',
                     outName=None, quiet=False, permissive=None):
+        inputFile = os.path.expanduser(inputFile)
+        if thermoFile:
+            thermoFile = os.path.expanduser(thermoFile)
+        if transportFile:
+            transportFile = os.path.expanduser(transportFile)
+        if outName:
+            outName = os.path.expanduser(outName)
+
         if quiet:
             logging.basicConfig(level=logging.ERROR)
         else:
@@ -1807,6 +1836,8 @@ duplicate transport data) to be ignored.
         if permissive is not None:
             self.warning_as_error = not permissive
 
+        if not os.path.exists(inputFile):
+            raise IOError('Missing input file: {0!r}'.format(inputFile))
         try:
             # Read input mechanism files
             self.loadChemkinFile(inputFile)
@@ -1816,6 +1847,8 @@ duplicate transport data) to be ignored.
             raise
 
         if thermoFile:
+            if not os.path.exists(thermoFile):
+                raise IOError('Missing thermo file: {0!r}'.format(thermoFile))
             try:
                 self.loadChemkinFile(thermoFile)
             except Exception:
@@ -1824,8 +1857,10 @@ duplicate transport data) to be ignored.
                 raise
 
         if transportFile:
+            if not os.path.exists(transportFile):
+                raise IOError('Missing transport file: {0!r}'.format(transportFile))
             lines = [strip_nonascii(line) for line in open(transportFile, 'rU')]
-            self.parseTransportData(lines)
+            self.parseTransportData(lines, transportFile, 1)
 
             # Transport validation: make sure all species have transport data
             for s in self.speciesList:
@@ -1881,7 +1916,7 @@ def main(argv):
         if not outName.endswith('.cti'):
             outName += '.cti'
     else:
-        outName = None
+        outName = os.path.splitext(inputFile)[0] + '.cti'
 
     permissive = '--permissive' in options
     thermoFile = options.get('--thermo')
@@ -1890,6 +1925,23 @@ def main(argv):
 
     parser.convertMech(inputFile, thermoFile, transportFile, phaseName,
                        outName, permissive=permissive)
+
+    # Do full validation by importing the resulting mechanism
+    try:
+        import cantera as ct
+    except ImportError:
+        print('WARNING: Unable to import Cantera Python module. Output '
+              'mechanism has not been validated')
+        sys.exit(0)
+
+    try:
+        print('Validating mechanism...', end='')
+        gas = ct.Solution(outName)
+        print('PASSED.')
+    except RuntimeError as e:
+        print('FAILED.')
+        print(e)
+        sys.exit(1)
 
 if __name__ == '__main__':
     import sys

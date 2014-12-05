@@ -38,10 +38,10 @@ class TestReactor(utilities.CanteraTest):
 
     def test_insert(self):
         R = self.reactorClass()
-        f1 = lambda r: r.T
-        f2 = lambda r: r.kinetics.net_production_rates
-        self.assertRaises(Exception, f1, R)
-        self.assertRaises(Exception, f2, R)
+        with self.assertRaises(Exception):
+            R.T
+        with self.assertRaises(Exception):
+            R.kinetics.net_production_rates
 
         g = ct.Solution('h2o2.xml')
         g.TP = 300, 101325
@@ -49,6 +49,13 @@ class TestReactor(utilities.CanteraTest):
 
         self.assertNear(R.T, 300)
         self.assertEqual(len(R.kinetics.net_production_rates), g.n_species)
+
+    def test_volume(self):
+        R = self.reactorClass(volume=11)
+        self.assertEqual(R.volume, 11)
+
+        R.volume = 9
+        self.assertEqual(R.volume, 9)
 
     def test_names(self):
         self.make_reactors()
@@ -339,7 +346,7 @@ class TestReactor(utilities.CanteraTest):
         self.assertEqual(self.r1.outlets, self.r2.inlets)
         self.assertTrue(self.r1.energy_enabled)
         self.assertTrue(self.r2.energy_enabled)
-        self.assertTrue((self.r1.thermo.P - self.r2.thermo.P) * k,
+        self.assertNear((self.r1.thermo.P - self.r2.thermo.P) * k,
                         valve.mdot(0))
 
         m1a = self.r1.thermo.density * self.r1.volume
@@ -352,7 +359,7 @@ class TestReactor(utilities.CanteraTest):
         m1b = self.r1.thermo.density * self.r1.volume
         m2b = self.r2.thermo.density * self.r2.volume
 
-        self.assertTrue((self.r1.thermo.P - self.r2.thermo.P) * k,
+        self.assertNear((self.r1.thermo.P - self.r2.thermo.P) * k,
                         valve.mdot(0.1))
         self.assertNear(m1a+m2a, m1b+m2b)
         Y1b = self.r1.thermo.Y
@@ -473,6 +480,58 @@ class TestReactor(utilities.CanteraTest):
 
         self.assertNear(p1a, p1b)
         self.assertNear(p2a, p2b)
+
+    def test_reinitialize(self):
+        self.make_reactors(T1=300, T2=1000, independent=False)
+        self.add_wall(U=200, A=1.0)
+        self.net.advance(1.0)
+        T1a = self.r1.T
+        T2a = self.r2.T
+
+        self.r1.thermo.TD = 300, None
+        self.r1.syncState()
+
+        self.r2.thermo.TD = 1000, None
+        self.r2.syncState()
+
+        self.assertNear(self.r1.T, 300)
+        self.assertNear(self.r2.T, 1000)
+        self.net.advance(2.0)
+        T1b = self.r1.T
+        T2b = self.r2.T
+
+        self.assertNear(T1a, T1b)
+        self.assertNear(T2a, T2b)
+
+    def test_unpicklable(self):
+        self.make_reactors()
+        import pickle
+        with self.assertRaises(NotImplementedError):
+            pickle.dumps(self.r1)
+        with self.assertRaises(NotImplementedError):
+            pickle.dumps(self.net)
+
+    def test_uncopyable(self):
+        self.make_reactors()
+        import copy
+        with self.assertRaises(NotImplementedError):
+            copy.copy(self.r1)
+        with self.assertRaises(NotImplementedError):
+            copy.copy(self.net)
+
+    def test_invalid_property(self):
+        self.make_reactors()
+        for x in (self.r1, self.net):
+            with self.assertRaises(AttributeError):
+                x.foobar = 300
+            with self.assertRaises(AttributeError):
+                x.foobar
+
+    def test_bad_kwarg(self):
+        self.reactorClass(name='ok')
+        with self.assertRaises(TypeError):
+            r1 = self.reactorClass(foobar=3.14)
+
 
 class TestIdealGasReactor(TestReactor):
     reactorClass = ct.IdealGasReactor
@@ -765,14 +824,16 @@ class TestWallKinetics(utilities.CanteraTest):
         C_left = self.w.left.coverages
 
         self.assertEqual(self.w.right.kinetics, None)
-        self.assertRaises(Exception, lambda: self.w.right.coverages)
+        with self.assertRaises(Exception):
+            self.w.right.coverages
 
         self.make_reactors()
         self.w.right.kinetics = self.interface
         self.w.right.coverages = C
         self.assertArrayNear(self.w.right.coverages, C)
         self.assertEqual(self.w.left.kinetics, None)
-        self.assertRaises(Exception, lambda: self.w.left.coverages)
+        with self.assertRaises(Exception):
+            self.w.left.coverages
         self.net.advance(1e-5)
         C_right = self.w.right.coverages
 
@@ -1116,7 +1177,7 @@ class CombustorTestImplementation(object):
 
         # create the combustor, and fill it in initially with a diluent
         self.gas.TPX = 300.0, ct.one_atm, 'AR:1.0'
-        self.combustor = ct.IdealGasReactor(self.gas, volume=1.0)
+        self.combustor = ct.IdealGasReactor(self.gas)
 
         # create a reservoir for the exhaust
         self.exhaust = ct.Reservoir(self.gas)

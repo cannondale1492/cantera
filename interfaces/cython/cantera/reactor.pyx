@@ -11,7 +11,8 @@ cdef class ReactorBase:
     def __cinit__(self, *args, **kwargs):
         self.rbase = newReactor(stringify(self.reactor_type))
 
-    def __init__(self, ThermoPhase contents=None, name=None, **kwargs):
+    # The signature of this function causes warnings for Sphinx documentation
+    def __init__(self, ThermoPhase contents=None, name=None, *, volume=None):
         self._inlets = []
         self._outlets = []
         self._walls = []
@@ -24,6 +25,9 @@ cdef class ReactorBase:
             reactor_counts[self.reactor_type] += 1
             n = reactor_counts[self.reactor_type]
             self.name = '{0}_{1}'.format(self.reactor_type, n)
+
+        if volume is not None:
+            self.volume = volume
 
     def __dealloc__(self):
         del self.rbase
@@ -43,6 +47,14 @@ cdef class ReactorBase:
 
         def __set__(self, name):
             self.rbase.setName(stringify(name))
+
+    def syncState(self):
+        """
+        Set the state of the Reactor to match that of the associated
+        `ThermoPhase` object. After calling syncState(), call
+        ReactorNet.reinitialize() before further integration.
+        """
+        self.rbase.syncState()
 
     property thermo:
         """The `ThermoPhase` object representing the reactor's contents."""
@@ -115,6 +127,12 @@ cdef class ReactorBase:
         """
         self._walls.append(wall)
 
+    def __reduce__(self):
+        raise NotImplementedError('Reactor object is not picklable')
+
+    def __copy__(self):
+        raise NotImplementedError('Reactor object is not copyable')
+
 
 cdef class Reactor(ReactorBase):
     """
@@ -128,6 +146,7 @@ cdef class Reactor(ReactorBase):
     def __cinit__(self, *args, **kwargs):
         self.reactor = <CxxReactor*>(self.rbase)
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, contents=None, *, name=None, energy='on', **kwargs):
         """
         :param contents:
@@ -350,6 +369,7 @@ cdef class Wall:
     temperature of the reactor it faces.
     """
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, left, right, *, name=None, A=None, K=None, U=None,
                  Q=None, velocity=None, kinetics=(None,None)):
         """
@@ -529,6 +549,7 @@ cdef class FlowDevice:
         # Children of this abstract class are responsible for allocating dev
         self.dev = NULL
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, upstream, downstream, *, name=None):
         assert self.dev != NULL
         self._rate_func = None
@@ -588,6 +609,7 @@ cdef class MassFlowController(FlowDevice):
     def __cinit__(self, *args, **kwargs):
         self.dev = new CxxMassFlowController()
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, upstream, downstream, *, name=None, mdot=None):
         super().__init__(upstream, downstream, name=name)
         if mdot is not None:
@@ -636,6 +658,7 @@ cdef class Valve(FlowDevice):
     def __cinit__(self, *args, **kwargs):
         self.dev = new CxxValve()
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, upstream, downstream, *, name=None, K=None):
         super().__init__(upstream, downstream, name=name)
         if K is not None:
@@ -682,6 +705,7 @@ cdef class PressureController(FlowDevice):
     def __cinit__(self, *args, **kwargs):
         self.dev = new CxxPressureController()
 
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, upstream, downstream, *, name=None, master=None, K=None):
         super().__init__(upstream, downstream, name=name)
         if master is not None:
@@ -723,10 +747,10 @@ cdef class ReactorNet:
         for R in reactors:
             self.add_reactor(R)
 
-    def add_reactor(self, ReactorBase r):
+    def add_reactor(self, Reactor r):
         """Add a reactor to the network."""
         self._reactors.append(r)
-        self.net.addReactor(r.rbase)
+        self.net.addReactor(deref(r.reactor))
 
     def advance(self, double t):
         """
@@ -741,6 +765,14 @@ cdef class ReactorNet:
         taking the step is returned.
         """
         return self.net.step(t)
+
+    def reinitialize(self):
+        """
+        Reinitialize the integrator after making changing to the state of the
+        system. Changes to Reactor contents will automatically trigger
+        reinitialization.
+        """
+        self.net.reinitialize()
 
     property time:
         """The current time [s]."""
@@ -888,3 +920,9 @@ cdef class ReactorNet:
         """
         def __get__(self):
             return self.net.neq()
+
+    def __reduce__(self):
+        raise NotImplementedError('ReactorNet object is not picklable')
+
+    def __copy__(self):
+        raise NotImplementedError('ReactorNet object is not copyable')

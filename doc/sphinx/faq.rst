@@ -2,21 +2,69 @@
 Frequently Asked Questions
 **************************
 
-Installation
-------------
+Installation & Compilation
+--------------------------
 
 **How do I install Cantera on Windows?**
 
     Download the MSI installer for Cantera and the corresponding Python module
-    from `Google Code <https://code.google.com/p/cantera/downloads/list>`_.
+    from `SourceForge <https://sourceforge.net/projects/cantera/files/cantera/>`_.
     Choose between x86 and x64 based on the versions of Python and/or Matlab
-    you want to work with.
+    you want to work with. See :ref:`Windows Installation <sec-install-win>`
+    for details.
 
 **How do I install Cantera on Linux?**
 
-    Download the source code from `Google Code
-    <https://code.google.com/p/cantera/downloads/list>`_ and follow the
+    For Ubuntu, packages for the current stable version of Cantera are available
+    in a PPA. See :ref:`Ubuntu Installation <sec-install-ubuntu>` for details.
+
+    For other Linux distributions, download the source code (e.g.
+    ``cantera-2.1.1.tar.gz``) from `SourceForge
+    <https://sourceforge.net/projects/cantera/files/cantera/>`_ and follow the
     instructions in the :ref:`sec-compiling`.
+
+**How do I install Cantera on Mac OS X?**
+
+    Cantera can be installed using Homebrew. See :ref:`Mac OS X Installation
+    <sec-install-osx>` for details.
+
+**What do I do if compiling Cantera fails?**
+
+    - Examine the output of the ``scons build`` command, especially anything
+      identified as a       ``WARNING`` or ``ERROR``. Check for discrepancies
+      with your expected configuration (e.g. not finding SUNDIALS even though
+      you have it installed).
+    - Check the contents of ``cantera.conf`` to make sure they are correct.
+    - If any of the configuration tests (``Checking for...``) fail unexpectedly,
+      look at the contents of ``config.log`` to determine the reason.
+    - If none of these help identify the cause of the failure, consider asking
+      for help on the Cantera Users' Group. If you decide to make a post, please
+      include the following information:
+
+      * The contents of ``cantera.conf`` and ``config.log``
+      * The output of the ``scons build`` and ``scons build dump`` commands
+        (you can direct this output to a file by running ``scons build >buildlog.txt 2>&1``)
+      * The exact version of Cantera you are trying to compile, and how it was
+        obtained (i.e. downloaded source tarball or the specific Git/SVN commit)
+      * Your operating system, compiler versions, and the versions of any other
+        relevant software.
+
+**How do I debug issues with the SCons build system?**
+
+    Sometimes, it is helpful to see all of the internal variables defined by
+    SCons, either automatically or by the Cantera build scripts. To do this, add
+    ``dump`` to your SCons command line. For example::
+
+        $ scons build dump
+
+    will show the variables that would be set during the ``build`` step. Note
+    that in this case, the ``build`` step will not be executed.
+
+    Alternatively, it is also possible to run SCons through the Python debugger, and set a breakpoint in the ``SConstruct`` file. For example::
+
+        $ scons --debug=pdb build
+        (Pdb) b /full/path/to/SConstruct:33
+        (Pdb) cont
 
 General
 -------
@@ -42,6 +90,29 @@ General
     subdirectory of the Cantera Python module installation directory, or in
     the ``interfaces/cython/cantera/examples`` subdirectory of the Cantera
     source directory.
+
+**How should I cite Cantera?**
+
+    The recommended citation for Cantera is as follows:
+
+    David G. Goodwin, Harry K. Moffat, and Raymond L. Speth. *Cantera: An object-
+    oriented software toolkit for chemical kinetics, thermodynamics, and
+    transport processes*. http://www.cantera.org, 2014. Version 2.2.0.
+
+    The following BibTeX entry may also be used::
+
+        @Misc{Cantera,
+           author = "David G. Goodwin and Harry K. Moffat and Raymond L. Speth",
+           title = "Cantera: An Object-oriented Software Toolkit for Chemical
+                    Kinetics, Thermodynamics, and Transport Processes",
+           year = 2014,
+           note = "Version 2.2.0",
+           howpublished = "\url{http://www.cantera.org}"
+        }
+
+    If you are using a different version of Cantera, update the ``version`` and
+    ``year`` fields accordingly.
+
 
 Support and Bug Reporting
 -------------------------

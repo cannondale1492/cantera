@@ -1,6 +1,18 @@
+import warnings
+
 cdef enum Thermasis:
     mass_basis = 0
     molar_basis = 1
+
+
+cdef stdmap[string,double] comp_map(dict X) except *:
+    cdef stdmap[string,double] m
+    cdef str species
+    cdef float val
+    for species,value in X.items():
+        m[stringify(species)] = value
+    return m
+
 
 cdef class ThermoPhase(_SolutionBase):
     """
@@ -12,12 +24,13 @@ cdef class ThermoPhase(_SolutionBase):
     Class `ThermoPhase` is not usually instantiated directly. It is used
     as a base class for classes `Solution` and `Interface`.
     """
+    # The signature of this function causes warnings for Sphinx documentation
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'source' not in kwargs:
             self.thermo_basis = mass_basis
 
-    def report(self, show_thermo=True):
+    def report(self, show_thermo=True, float threshold=1e-14):
         """
         Generate a report describing the thermodynamic state of this phase. To
         print the report to the terminal, simply call the phase object. The
@@ -26,10 +39,10 @@ cdef class ThermoPhase(_SolutionBase):
         >>> phase()
         >>> print(phase.report())
         """
-        return pystr(self.thermo.report(bool(show_thermo)))
+        return pystr(self.thermo.report(bool(show_thermo), threshold))
 
-    def __call__(self):
-        print(self.report())
+    def __call__(self, *args, **kwargs):
+        print(self.report(*args, **kwargs))
 
     property name:
         """
@@ -88,7 +101,8 @@ cdef class ThermoPhase(_SolutionBase):
             return 1.0
 
     def equilibrate(self, XY, solver='auto', double rtol=1e-9,
-                    int maxsteps=1000, int maxiter=100, int loglevel=0):
+                    int maxsteps=1000, int maxiter=100, int estimate_equil=0,
+                    int loglevel=0):
         """
         Set to a state of chemical equilibrium holding property pair
         *XY* constant.
@@ -116,26 +130,33 @@ cdef class ThermoPhase(_SolutionBase):
             For the Gibbs minimization solver, this specifies the number of
             'outer' iterations on T or P when some property pair other
             than TP is specified.
+        :param estimate_equil:
+            Integer indicating whether the solver should estimate its own
+            initial condition. If 0, the initial mole fraction vector in the
+            ThermoPhase object is used as the initial condition. If 1, the
+            initial mole fraction vector is used if the element abundances are
+            satisfied. If -1, the initial mole fraction vector is thrown out,
+            and an estimate is formulated.
         :param loglevel:
             Set to a value > 0 to write diagnostic output.
             """
-        cdef int iSolver
         if isinstance(solver, int):
-            iSolver = solver
-        elif solver == 'auto':
-            iSolver = -1
-        elif solver == 'element_potential':
-            iSolver = 0
-        elif solver == 'gibbs':
-            iSolver = 1
-        elif solver == 'vcs':
-            iSolver = 2
-        else:
-            raise ValueError('Invalid equilibrium solver specified')
+            warnings.warn('ThermoPhase.equilibrate: Using integer solver '
+                'flags is deprecated, and will be disabled after Cantera 2.2.')
+            if solver == -1:
+                solver = 'auto'
+            elif solver == 0:
+                solver = 'element_potential'
+            elif solver == 1:
+                solver = 'gibbs'
+            elif solver == 2:
+                solver = 'vcs'
+            else:
+                raise ValueError('Invalid equilibrium solver specified: '
+                    '"{0}"'.format(solver))
 
-        XY = XY.upper()
-        equilibrate(deref(self.thermo), stringify(XY).c_str(),
-                    iSolver, rtol, maxsteps, maxiter, loglevel)
+        self.thermo.equilibrate(stringify(XY.upper()), stringify(solver), rtol,
+                                maxsteps, maxiter, estimate_equil, loglevel)
 
     ####### Composition, species, and elements ########
 
@@ -236,11 +257,16 @@ cdef class ThermoPhase(_SolutionBase):
             return data
 
     cdef void _setArray1(self, thermoMethod1d method, values) except *:
-        if len(values) != self.n_species:
-            raise ValueError("Array has incorrect length")
+        cdef np.ndarray[np.double_t, ndim=1] data
 
-        cdef np.ndarray[np.double_t, ndim=1] data = \
-            np.ascontiguousarray(values, dtype=np.double)
+        if len(values) == self.n_species:
+            data = np.ascontiguousarray(values, dtype=np.double)
+        elif len(values) == len(self._selected_species):
+            data = np.zeros(self.n_species, dtype=np.double)
+            for i,k in enumerate(self._selected_species):
+                data[k] = values[i]
+        else:
+            raise ValueError("Array has incorrect length")
         method(self.thermo, &data[0])
 
     property molecular_weights:
@@ -255,10 +281,11 @@ cdef class ThermoPhase(_SolutionBase):
 
     property Y:
         """
-        Get/Set the species mass fractions. Can be set as either an array or
-        as a string. Always returns an array::
+        Get/Set the species mass fractions. Can be set as an array, as a dictionary,
+        or as a string. Always returns an array::
 
             >>> phase.Y = [0.1, 0, 0, 0.4, 0, 0, 0, 0, 0.5]
+            >>> phase.Y = {'H2':0.1, 'O2':0.4, 'AR':0.5}
             >>> phase.Y = 'H2:0.1, O2:0.4, AR:0.5'
             >>> phase.Y
             array([0.1, 0, 0, 0.4, 0, 0, 0, 0, 0.5])
@@ -268,25 +295,29 @@ cdef class ThermoPhase(_SolutionBase):
         def __set__(self, Y):
             if isinstance(Y, (str, unicode)):
                 self.thermo.setMassFractionsByName(stringify(Y))
+            elif isinstance(Y, dict):
+                self.thermo.setMassFractionsByName(comp_map(Y))
             else:
                 self._setArray1(thermo_setMassFractions, Y)
 
     property X:
         """
-        Get/Set the species mole fractions. Can be set as either an array or
-        as a string. Always returns an array::
+        Get/Set the species mole fractions. Can be set as an array, as a dictionary,
+        or as a string. Always returns an array::
 
             >>> phase.X = [0.1, 0, 0, 0.4, 0, 0, 0, 0, 0.5]
+            >>> phase.X = {'H2':0.1, 'O2':0.4, 'AR':0.5}
             >>> phase.X = 'H2:0.1, O2:0.4, AR:0.5'
             >>> phase.X
             array([0.1, 0, 0, 0.4, 0, 0, 0, 0, 0.5])
-
         """
         def __get__(self):
             return self._getArray1(thermo_getMoleFractions)
         def __set__(self, X):
             if isinstance(X, (str, unicode)):
                 self.thermo.setMoleFractionsByName(stringify(X))
+            elif isinstance(X, dict):
+                self.thermo.setMoleFractionsByName(comp_map(X))
             else:
                 self._setArray1(thermo_setMoleFractions, X)
 
@@ -296,6 +327,40 @@ cdef class ThermoPhase(_SolutionBase):
             return self._getArray1(thermo_getConcentrations)
         def __set__(self, C):
             self._setArray1(thermo_setConcentrations, C)
+
+    def set_unnormalized_mass_fractions(self, Y):
+        """
+        Set the mass fractions without normalizing to force sum(Y) == 1.0.
+        Useful primarily when calculating derivatives with respect to Y[k] by
+        finite difference.
+        """
+        cdef np.ndarray[np.double_t, ndim=1] data
+        if len(Y) == self.n_species:
+            data = np.ascontiguousarray(Y, dtype=np.double)
+        else:
+            raise ValueError("Array has incorrect length")
+        self.thermo.setMassFractions_NoNorm(&data[0])
+
+    def set_unnormalized_mole_fractions(self, X):
+        """
+        Set the mole fractions without normalizing to force sum(X) == 1.0.
+        Useful primarily when calculating derivatives with respect to X[k]
+        by finite difference.
+        """
+        cdef np.ndarray[np.double_t, ndim=1] data
+        if len(X) == self.n_species:
+            data = np.ascontiguousarray(X, dtype=np.double)
+        else:
+            raise ValueError("Array has incorrect length")
+        self.thermo.setMoleFractions_NoNorm(&data[0])
+
+    def mass_fraction_dict(self, double threshold=0.0):
+        Y = self.thermo.getMassFractionsByName(threshold)
+        return {pystr(item.first):item.second for item in Y}
+
+    def mole_fraction_dict(self, double threshold=0.0):
+        X = self.thermo.getMoleFractionsByName(threshold)
+        return {pystr(item.first):item.second for item in X}
 
     ######## Read-only thermodynamic properties ########
 
@@ -865,11 +930,15 @@ cdef class PureFluid(ThermoPhase):
         def __get__(self):
             return self.T, self.X
         def __set__(self, values):
-            self.thermo.setState_Tsat(values[0], values[1])
+            T = values[0] if values[0] is not None else self.T
+            X = values[1] if values[1] is not None else self.X
+            self.thermo.setState_Tsat(T, X)
 
     property PX:
         """Get/Set the pressure and vapor fraction of a two-phase state."""
         def __get__(self):
             return self.P, self.X
         def __set__(self, values):
-            self.thermo.setState_Psat(values[0], values[1])
+            P = values[0] if values[0] is not None else self.P
+            X = values[1] if values[1] is not None else self.X
+            self.thermo.setState_Psat(P, X)

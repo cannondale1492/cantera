@@ -14,8 +14,6 @@
 #include "cantera/base/ct_defs.h"
 #include "mix_defs.h"
 
-class WaterPropsIAPWS;
-
 namespace Cantera
 {
 /**
@@ -245,14 +243,6 @@ public:
      */
     PDSS_enumType reportPDSSType() const;
 
-private:
-    //! Set an error within this object for an unhandled capability
-    /*!
-     * @param msg    Message string for this error
-     */
-    void err(const std::string& msg) const;
-
-public:
      //! @}
      //! @name Molar Thermodynamic Properties of the Species Standard State in the Solution
      //! @{
@@ -447,7 +437,7 @@ public:
     virtual void setTemperature(doublereal temp);
 
     //! Return the current stored temperature
-    doublereal temperature() const;
+    virtual doublereal temperature() const;
 
     //! Set the internal temperature and pressure
     /*!
@@ -681,6 +671,26 @@ protected:
      *  at the current value of T and P.
      */
     doublereal* m_Vss_ptr;
+};
+
+//! Base class for PDSS classes which compute molar properties directly
+class PDSS_Molar : public virtual PDSS
+{
+public:
+    virtual doublereal enthalpy_RT() const;
+    virtual doublereal entropy_R() const;
+    virtual doublereal gibbs_RT() const;
+    virtual doublereal cp_R() const;
+};
+
+//! Base class for PDSS classes which compute nondimensional properties directly
+class PDSS_Nondimensional : public virtual PDSS
+{
+public:
+    virtual doublereal enthalpy_mole() const;
+    virtual doublereal entropy_mole() const;
+    virtual doublereal gibbs_mole() const;
+    virtual doublereal cp_mole() const;
 };
 
 }

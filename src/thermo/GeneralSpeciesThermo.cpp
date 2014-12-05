@@ -7,16 +7,7 @@
 // Copyright 2001-2004  California Institute of Technology
 
 #include "cantera/thermo/GeneralSpeciesThermo.h"
-#include "cantera/thermo/NasaPoly1.h"
-#include "NasaPoly2.h"
-#include "ShomatePoly.h"
-#include "ConstCpPoly.h"
-#include "cantera/thermo/Mu0Poly.h"
-#include "cantera/thermo/AdsorbateThermo.h"
 #include "cantera/thermo/SpeciesThermoFactory.h"
-#include <iostream>
-
-using namespace std;
 
 namespace Cantera
 {
@@ -24,24 +15,25 @@ GeneralSpeciesThermo::GeneralSpeciesThermo() :
     SpeciesThermo(),
     m_tlow_max(0.0),
     m_thigh_min(1.0E30),
-    m_p0(OneAtm),
-    m_kk(0)
+    m_p0(OneAtm)
 {
-    m_tlow_max = 0.0;
-    m_thigh_min = 1.0E30;
 }
 
-GeneralSpeciesThermo::
-GeneralSpeciesThermo(const GeneralSpeciesThermo& b) :
+GeneralSpeciesThermo::GeneralSpeciesThermo(const GeneralSpeciesThermo& b) :
+    SpeciesThermo(b),
+    m_tpoly(b.m_tpoly),
     m_tlow_max(b.m_tlow_max),
     m_thigh_min(b.m_thigh_min),
-    m_kk(b.m_kk)
+    m_p0(b.m_p0)
 {
-    m_sp.resize(m_kk, 0);
-    for (size_t k = 0; k < m_kk; k++) {
-        SpeciesThermoInterpType* bk = b.m_sp[k];
-        if (bk) {
-            m_sp[k] = bk->duplMyselfAsSpeciesThermoInterpType();
+    clear();
+    // Copy SpeciesThermoInterpTypes from 'b'
+    for (STIT_map::const_iterator iter = b.m_sp.begin();
+         iter != b.m_sp.end();
+         iter++) {
+        for (size_t k = 0; k < iter->second.size(); k++) {
+            const SpeciesThermoInterpType* spec = iter->second[k];
+            m_sp[iter->first].push_back(spec->duplMyselfAsSpeciesThermoInterpType());
         }
     }
 }
@@ -49,45 +41,51 @@ GeneralSpeciesThermo(const GeneralSpeciesThermo& b) :
 GeneralSpeciesThermo&
 GeneralSpeciesThermo::operator=(const GeneralSpeciesThermo& b)
 {
-    if (&b != this) {
-        m_tlow_max = b.m_tlow_max;
-        m_thigh_min = b.m_thigh_min;
+    if (&b == this) {
+        return *this;
+    }
 
-        for (size_t k = 0; k < m_kk; k++) {
-            SpeciesThermoInterpType* sp = m_sp[k];
-            if (sp) {
-                delete sp;
-                m_sp[k] = 0;
-            }
-        }
-        m_kk = b.m_kk;
-        m_sp.resize(m_kk, 0);
-        for (size_t k = 0; k < m_kk; k++) {
-            SpeciesThermoInterpType* bk = b.m_sp[k];
-            if (bk) {
-                m_sp[k] = bk->duplMyselfAsSpeciesThermoInterpType();
-            }
+    SpeciesThermo::operator=(b);
+    clear();
+    // Copy SpeciesThermoInterpType objects from 'b'
+    for (STIT_map::const_iterator iter = b.m_sp.begin();
+         iter != b.m_sp.end();
+         iter++) {
+        for (size_t k = 0; k < iter->second.size(); k++) {
+            const SpeciesThermoInterpType* spec = iter->second[k];
+            m_sp[iter->first].push_back(spec->duplMyselfAsSpeciesThermoInterpType());
         }
     }
+
+    m_tpoly = b.m_tpoly;
+    m_tlow_max = b.m_tlow_max;
+    m_thigh_min = b.m_thigh_min;
+    m_p0 = b.m_p0;
+
     return *this;
 }
 
 GeneralSpeciesThermo::~GeneralSpeciesThermo()
 {
-    for (size_t k = 0; k < m_kk; k++) {
-        SpeciesThermoInterpType* sp = m_sp[k];
-        if (sp) {
-            delete sp;
-            m_sp[k] = 0;
-        }
-    }
+    clear();
 }
-
 
 SpeciesThermo*
 GeneralSpeciesThermo::duplMyselfAsSpeciesThermo() const
 {
     return new GeneralSpeciesThermo(*this);
+}
+
+void GeneralSpeciesThermo::clear()
+{
+    for (STIT_map::const_iterator iter = m_sp.begin();
+         iter != m_sp.end();
+         iter++) {
+        for (size_t k = 0; k < iter->second.size(); k++) {
+            delete iter->second[k];
+        }
+    }
+    m_sp.clear();
 }
 
 void GeneralSpeciesThermo::install(const std::string& name,
@@ -98,103 +96,42 @@ void GeneralSpeciesThermo::install(const std::string& name,
                                    doublereal maxTemp_,
                                    doublereal refPressure_)
 {
-    /*
-     * Resize the arrays if necessary, filling the empty
-     * slots with the zero pointer.
-     */
-
     if (minTemp_ <= 0.0) {
-        throw CanteraError("Error in GeneralSpeciesThermo.cpp",
-                           " Cannot take 0 tmin as input. \n\n");
+        throw CanteraError("GeneralSpeciesThermo::install",
+                           "T_min must be positive");
     }
 
-    if (index >= m_kk) {
-        m_sp.resize(index+1, 0);
-        m_kk = index+1;
-    }
-
-    //int nfreq = 3;
     /*
      * Create the necessary object
      */
-
-    switch (type) {
-    case NASA1:
-        m_sp[index] = new NasaPoly1(index, minTemp_, maxTemp_,
-                                    refPressure_, c);
-        break;
-    case SHOMATE1:
-        m_sp[index] = new ShomatePoly(index, minTemp_, maxTemp_,
-                                      refPressure_, c);
-        break;
-    case CONSTANT_CP:
-    case SIMPLE:
-        m_sp[index] = new ConstCpPoly(index, minTemp_, maxTemp_,
-                                      refPressure_, c);
-        break;
-    case MU0_INTERP:
-        m_sp[index] = new Mu0Poly(index, minTemp_, maxTemp_,
-                                  refPressure_, c);
-        break;
-    case SHOMATE2:
-        m_sp[index] = new ShomatePoly2(index, minTemp_, maxTemp_,
-                                       refPressure_, c);
-        break;
-    case NASA2:
-        m_sp[index] = new NasaPoly2(index, minTemp_, maxTemp_,
-                                    refPressure_, c);
-        break;
-
-    case STAT:
-        m_sp[index] = new StatMech(index, minTemp_, maxTemp_,
-                                   refPressure_, c, name);
-        break;
-
-    case ADSORBATE:
-        m_sp[index] = new Adsorbate(index, minTemp_, maxTemp_,
-                                    refPressure_, c);
-        break;
-    default:
-        throw UnknownSpeciesThermoModel(
-            "GeneralSpeciesThermo::install",
-            "unknown species type", int2str(type));
-        break;
-    }
-    if (!m_sp[index]) {
-        cout << "Null m_sp... index = " << index << endl;
-        cout << "type = " << type << endl;
-    }
-    m_tlow_max = max(minTemp_, m_tlow_max);
-    m_thigh_min = min(maxTemp_, m_thigh_min);
+    SpeciesThermoInterpType* sp = newSpeciesThermoInterpType(type,
+        minTemp_, maxTemp_, refPressure_, c);
+    sp->setIndex(index);
+    sp->validate(name);
+    install_STIT(sp);
 }
 
 void GeneralSpeciesThermo::install_STIT(SpeciesThermoInterpType* stit_ptr)
 {
-    /*
-     * Resize the arrays if necessary, filling the empty
-     * slots with the zero pointer.
-     */
     if (!stit_ptr) {
         throw CanteraError("GeneralSpeciesThermo::install_STIT",
                            "zero pointer");
     }
     size_t index = stit_ptr->speciesIndex();
-    if (index >= m_kk) {
-        m_sp.resize(index+1, 0);
-        m_kk = index+1;
-    }
-    AssertThrow(m_sp[index] == 0,
+    AssertThrow(m_speciesLoc.find(index) == m_speciesLoc.end(),
                 "Index position isn't null, duplication of assignment: " + int2str(index));
-    /*
-     *  Now, simply assign the position
-     */
-    m_sp[index] = stit_ptr;
 
-    /*
-     * Calculate max and min
-     */
-    m_tlow_max = max(stit_ptr->minTemp(), m_tlow_max);
-    m_thigh_min = min(stit_ptr->maxTemp(), m_thigh_min);
+    int type = stit_ptr->reportType();
+    m_speciesLoc[index] = std::make_pair(type, m_sp[type].size());
+    m_sp[type].push_back(stit_ptr);
+    if (m_sp[type].size() == 1) {
+        m_tpoly[type].resize(stit_ptr->temperaturePolySize());
+    }
+
+    // Calculate max and min T
+    m_tlow_max = std::max(stit_ptr->minTemp(), m_tlow_max);
+    m_thigh_min = std::min(stit_ptr->maxTemp(), m_thigh_min);
+    markInstalled(index);
 }
 
 void GeneralSpeciesThermo::installPDSShandler(size_t k, PDSS* PDSS_ptr,
@@ -204,49 +141,44 @@ void GeneralSpeciesThermo::installPDSShandler(size_t k, PDSS* PDSS_ptr,
     install_STIT(stit_ptr);
 }
 
-void GeneralSpeciesThermo::
-update_one(size_t k, doublereal t, doublereal* cp_R,
-           doublereal* h_RT, doublereal* s_R) const
+void GeneralSpeciesThermo::update_one(size_t k, doublereal t, doublereal* cp_R,
+                                      doublereal* h_RT, doublereal* s_R) const
 {
-    SpeciesThermoInterpType* sp_ptr = m_sp[k];
+    const SpeciesThermoInterpType* sp_ptr = provideSTIT(k);
     if (sp_ptr) {
         sp_ptr->updatePropertiesTemp(t, cp_R, h_RT, s_R);
     }
 }
 
-void GeneralSpeciesThermo::
-update(doublereal t, doublereal* cp_R,
-       doublereal* h_RT, doublereal* s_R) const
+void GeneralSpeciesThermo::update(doublereal t, doublereal* cp_R,
+                                  doublereal* h_RT, doublereal* s_R) const
 {
-    vector<SpeciesThermoInterpType*>::const_iterator _begin, _end;
-    _begin  = m_sp.begin();
-    _end    = m_sp.end();
-    SpeciesThermoInterpType* sp_ptr = 0;
-    for (; _begin != _end; ++_begin) {
-        sp_ptr = *(_begin);
-        if (sp_ptr) {
-            sp_ptr->updatePropertiesTemp(t, cp_R, h_RT, s_R);
+    STIT_map::const_iterator iter = m_sp.begin();
+    tpoly_map::iterator jter = m_tpoly.begin();
+    for (; iter != m_sp.end(); iter++, jter++) {
+        const std::vector<SpeciesThermoInterpType*>& species = iter->second;
+        double* tpoly = &jter->second[0];
+        species[0]->updateTemperaturePoly(t, tpoly);
+        for (size_t k = 0; k < species.size(); k++) {
+            species[k]->updateProperties(tpoly, cp_R, h_RT, s_R);
         }
-        // else {
-        //   writelog("General::update: sp_ptr is NULL!\n");
-        //}
     }
 }
 
 int GeneralSpeciesThermo::reportType(size_t index) const
 {
-    SpeciesThermoInterpType* sp = m_sp[index];
+    const SpeciesThermoInterpType* sp = provideSTIT(index);
     if (sp) {
         return sp->reportType();
     }
     return -1;
 }
 
-void GeneralSpeciesThermo::
-reportParams(size_t index, int& type, doublereal* const c,
-             doublereal& minTemp_, doublereal& maxTemp_, doublereal& refPressure_) const
+void GeneralSpeciesThermo::reportParams(size_t index, int& type,
+        doublereal* const c, doublereal& minTemp_, doublereal& maxTemp_,
+        doublereal& refPressure_) const
 {
-    SpeciesThermoInterpType* sp = m_sp[index];
+    const SpeciesThermoInterpType* sp = provideSTIT(index);
     size_t n;
     if (sp) {
         sp->reportParameters(n, type, minTemp_, maxTemp_,
@@ -262,10 +194,8 @@ reportParams(size_t index, int& type, doublereal* const c,
 
 doublereal GeneralSpeciesThermo::minTemp(size_t k) const
 {
-    if (k == npos) {
-        return m_tlow_max;
-    } else {
-        SpeciesThermoInterpType* sp = m_sp[k];
+    if (k != npos) {
+        const SpeciesThermoInterpType* sp = provideSTIT(k);
         if (sp) {
             return sp->minTemp();
         }
@@ -275,10 +205,8 @@ doublereal GeneralSpeciesThermo::minTemp(size_t k) const
 
 doublereal GeneralSpeciesThermo::maxTemp(size_t k) const
 {
-    if (k == npos) {
-        return m_thigh_min;
-    } else {
-        SpeciesThermoInterpType* sp = m_sp[k];
+    if (k != npos) {
+        const SpeciesThermoInterpType* sp = provideSTIT(k);
         if (sp) {
             return sp->maxTemp();
         }
@@ -288,10 +216,8 @@ doublereal GeneralSpeciesThermo::maxTemp(size_t k) const
 
 doublereal GeneralSpeciesThermo::refPressure(size_t k) const
 {
-    if (k == npos) {
-        return m_p0;
-    } else {
-        SpeciesThermoInterpType* sp = m_sp[k];
+    if (k != npos) {
+        const SpeciesThermoInterpType* sp = provideSTIT(k);
         if (sp) {
             return sp->refPressure();
         }
@@ -301,12 +227,28 @@ doublereal GeneralSpeciesThermo::refPressure(size_t k) const
 
 SpeciesThermoInterpType* GeneralSpeciesThermo::provideSTIT(size_t k)
 {
-    return m_sp[k];
+    try {
+        const std::pair<int, size_t>& loc = getValue(m_speciesLoc, k);
+        return getValue(m_sp, loc.first)[loc.second];
+    } catch (std::out_of_range&) {
+        return 0;
+    }
 }
 
-doublereal GeneralSpeciesThermo::reportOneHf298(int k) const
+const SpeciesThermoInterpType* GeneralSpeciesThermo::provideSTIT(size_t k) const
 {
-    SpeciesThermoInterpType* sp_ptr = m_sp[k];
+    try {
+        const std::pair<int, size_t>& loc = getValue(m_speciesLoc, k);
+        return getValue(m_sp, loc.first)[loc.second];
+    } catch (std::out_of_range&) {
+        return 0;
+    }
+}
+
+
+doublereal GeneralSpeciesThermo::reportOneHf298(const size_t k) const
+{
+    const SpeciesThermoInterpType* sp_ptr = provideSTIT(k);
     doublereal h = -1.0;
     if (sp_ptr) {
         h = sp_ptr->reportHf298(0);
@@ -314,9 +256,9 @@ doublereal GeneralSpeciesThermo::reportOneHf298(int k) const
     return h;
 }
 
-void GeneralSpeciesThermo::modifyOneHf298(const int k, const doublereal Hf298New)
+void GeneralSpeciesThermo::modifyOneHf298(const size_t k, const doublereal Hf298New)
 {
-    SpeciesThermoInterpType* sp_ptr = m_sp[k];
+    SpeciesThermoInterpType* sp_ptr = provideSTIT(k);
     if (sp_ptr) {
         sp_ptr->modifyOneHf298(k, Hf298New);
     }

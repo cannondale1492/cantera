@@ -15,16 +15,13 @@
 #ifndef CT_VPSSMGR_H
 #define CT_VPSSMGR_H
 
-#include "cantera/base/ct_defs.h"
 #include "mix_defs.h"
 #include "cantera/base/global.h"
 
 namespace Cantera
 {
 
-class SpeciesThermoInterpType;
 class VPStandardStateTP;
-class XML_Node;
 class SpeciesThermo;
 class PDSS;
 /**
@@ -631,7 +628,7 @@ public:
      * The following methods are used in the process of constructing the phase
      * and setting its parameters from a specification in an input file. They
      * are not normally used in application programs. To see how they are
-     * used, see files importCTML.cpp and ThermoFactory.cpp.
+     * used, see importPhase().
      */
     //@{
 
@@ -644,8 +641,6 @@ public:
      * subclasses that do not require initialization do not need to overload
      * this method.  When importing a CTML phase description, this method is
      * called just prior to returning from function importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
@@ -882,12 +877,6 @@ protected:
     mutable vector_fp      mPDSS_Vss;
 
     friend class PDSS;
-private:
-    //! Error message to indicate an unimplemented feature
-    /*!
-     * @param msg  Error message string
-     */
-    void err(const std::string& msg) const;
 };
 //@}
 }

@@ -106,6 +106,7 @@ public:
     double SSStar_Vol0;
 
     //! If true, this object will call Cantera to do its member calculations.
+    //! @deprecated Will always behave as if 'true' after Cantera 2.2
     bool UseCanteraCalls;
 
     int m_VCS_UnitsFormat;
@@ -140,7 +141,7 @@ public:
      *
      *  @return standard state free energy in Kelvin.
      */
-    virtual double G0_R_calc(size_t kspec, double TKelvin);
+    virtual double G0_R_calc(size_t kglob, double TKelvin);
 
     /**
      *  This function calculates the standard state molar volume

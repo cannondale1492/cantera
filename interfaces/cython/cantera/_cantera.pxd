@@ -1,5 +1,6 @@
 from libcpp.vector cimport vector
 from libcpp.string cimport string
+from libcpp.map cimport map as stdmap
 from libcpp cimport bool as cbool
 from cpython cimport bool as pybool
 
@@ -12,13 +13,12 @@ cdef extern from "cantera/base/xml.h" namespace "Cantera":
         XML_Node* findID(string)
         int nChildren()
 
-cdef extern from "cantera/base/ctml.h" namespace "ctml":
-    XML_Node getCtmlTree(string) except +
-
 cdef extern from "cantera/base/global.h" namespace "Cantera":
     cdef void CxxAddDirectory "Cantera::addDirectory" (string)
     cdef size_t CxxNpos "Cantera::npos"
     cdef void CxxAppdelete "Cantera::appdelete" ()
+    cdef XML_Node* CxxGetXmlFile "Cantera::get_XML_File" (string) except +
+    cdef XML_Node* CxxGetXmlFromString "Cantera::get_XML_from_string" (string) except +
 
 cdef extern from "cantera/thermo/mix_defs.h":
     cdef int thermo_type_ideal_gas "Cantera::cIdealGas"
@@ -45,7 +45,7 @@ cdef extern from "cantera/thermo/ThermoPhase.h" namespace "Cantera":
 
         # miscellaneous
         int eosType()
-        string report(cbool) except +
+        string report(cbool, double) except +
         string name()
         void setName(string)
         string id()
@@ -54,6 +54,7 @@ cdef extern from "cantera/thermo/ThermoPhase.h" namespace "Cantera":
         double maxTemp() except +
         double refPressure() except +
         cbool getElementPotentials(double*) except +
+        void equilibrate(string, string, double, int, int, int, int) except +
 
         # basic thermodynamic properties
         double temperature() except +
@@ -84,11 +85,17 @@ cdef extern from "cantera/thermo/ThermoPhase.h" namespace "Cantera":
 
         # composition
         void setMassFractionsByName(string) except +
+        void setMassFractionsByName(stdmap[string,double]&) except +
+        void setMassFractions_NoNorm(double*) except +
+        stdmap[string,double] getMassFractionsByName(double)
         double massFraction(size_t) except +
         double massFraction(string) except +
 
         void setMoleFractionsByName(string) except +
+        void setMoleFractionsByName(stdmap[string,double]&) except +
+        void setMoleFractions_NoNorm(double*) except +
         void getMoleFractions(double*) except +
+        stdmap[string,double] getMoleFractionsByName(double)
         double moleFraction(size_t) except +
         double moleFraction(string) except +
 
@@ -154,12 +161,15 @@ cdef extern from "cantera/kinetics/Kinetics.h" namespace "Cantera":
         int reactionPhaseIndex()
         int phaseIndex(string)
         int kineticsSpeciesIndex(int, int)
+        int kineticsSpeciesIndex(string)
 
         CxxThermoPhase& thermo(int)
 
         cbool isReversible(int) except +
         int reactionType(int) except +
         string reactionString(int) except +
+        string reactantString(int) except +
+        string productString(int) except +
         double reactantStoichCoeff(int, int) except +
         double productStoichCoeff(int, int) except +
 
@@ -201,6 +211,8 @@ cdef extern from "cantera/equil/MultiPhase.h" namespace "Cantera":
         void addPhase(CxxThermoPhase*, double) except +
         void init() except +
 
+        void equilibrate(string, string, double, int, int, int, int) except +
+
         size_t nSpecies()
         size_t nElements()
         size_t nPhases()
@@ -233,12 +245,6 @@ cdef extern from "cantera/equil/MultiPhase.h" namespace "Cantera":
         double cp() except +
         double volume() except +
 
-cdef extern from "cantera/equil/equil.h" namespace "Cantera":
-    int equilibrate(CxxThermoPhase&, char*, int, double, int, int, int) except +
-
-cdef extern from "cantera/equil/vcs_MultiPhaseEquil.h" namespace "Cantera":
-    int vcs_equilibrate(CxxMultiPhase&, char*, int, int, int, double, int, int, int) except +
-
 
 cdef extern from "cantera/zeroD/ReactorBase.h" namespace "Cantera":
     cdef cppclass CxxWall "Cantera::Wall"
@@ -248,6 +254,7 @@ cdef extern from "cantera/zeroD/ReactorBase.h" namespace "Cantera":
         CxxReactorBase()
         void setThermoMgr(CxxThermoPhase&) except +
         void restoreState() except +
+        void syncState() except +
         double volume()
         string name()
         void setName(string)
@@ -321,9 +328,10 @@ cdef extern from "cantera/zeroD/flowControllers.h":
 cdef extern from "cantera/zeroD/ReactorNet.h":
     cdef cppclass CxxReactorNet "Cantera::ReactorNet":
         CxxReactorNet()
-        void addReactor(CxxReactorBase*)
+        void addReactor(CxxReactor&)
         void advance(double) except +
         double step(double) except +
+        void reinitialize() except +
         double time()
         void setInitialTime(double)
         void setTolerances(double, double)
@@ -451,10 +459,11 @@ cdef extern from "cantera/oneD/Sim1D.h":
         void getInitialSoln() except +
         void solve(int, cbool) except +translate_exception
         void refine(int) except +
-        void setRefineCriteria(size_t, double, double, double, double)
+        void setRefineCriteria(size_t, double, double, double, double) except +
         void save(string, string, string, int) except +
         void restore(string, string, int) except +
         void writeStats(int) except +
+        void clearStats()
         int domainIndex(string) except +
         double value(size_t, size_t, size_t) except +
         double workValue(size_t, size_t, size_t) except +

@@ -6,9 +6,7 @@
 #ifndef CT_SOLIDTRANSPORTDATA_H
 #define CT_SOLIDTRANSPORTDATA_H
 
-#include "cantera/transport/TransportBase.h"
 #include "cantera/transport/TransportParams.h"
-#include "cantera/base/FactoryBase.h"
 #include "cantera/transport/LTPspecies.h"
 
 namespace Cantera
@@ -96,9 +94,6 @@ protected:
 
     //! Minimum temperatures for parameter fits
     //    doublereal tmin;
-
-    //! Pointer to the xml tree describing the implementation of transport for this object
-    //    XML_Writer* xml;
 
     //! Log level
     //    int log_level;

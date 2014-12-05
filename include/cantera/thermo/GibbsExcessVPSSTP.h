@@ -20,6 +20,7 @@
 #define CT_GIBBSEXCESSVPSSTP_H
 
 #include "VPStandardStateTP.h"
+#include "cantera/base/Array.h"
 
 namespace Cantera
 {
@@ -129,16 +130,6 @@ public:
      */
     virtual ThermoPhase* duplMyselfAsThermoPhase() const;
     //! @}
-
-    //! Equation of state type flag.
-    /*!
-     * The ThermoPhase base class returns
-     * zero. Subclasses should define this to return a unique
-     * non-zero value. Known constants defined for this purpose are
-     * listed in mix_defs.h. The MolalityVPSSTP class also returns
-     * zero, as it is a non-complete class.
-     */
-    virtual int eosType() const;
 
     //! @}
     //! @name Mechanical Properties
@@ -298,7 +289,7 @@ public:
      *                         log Activity Coefficients. length = m_kk
      */
     virtual void getdlnActCoeffdT(doublereal* dlnActCoeffdT) const {
-        err("getdlnActCoeffdT");
+        throw NotImplementedError("GibbsExcessVPSSTP::getdlnActCoeffdT");
     }
 
     //! Get the array of derivatives of the log activity coefficients with respect to the log of the species mole numbers
@@ -321,7 +312,8 @@ public:
      *                           log Activity Coefficients. length = m_kk * m_kk
      */
     virtual void getdlnActCoeffdlnN(const size_t ld, doublereal* const dlnActCoeffdlnN)  {
-        err(" getdlnActCoeffdlnN: nonzero and nonimplemented");
+        throw NotImplementedError("GibbsExcessVPSSTP::getdlnActCoeffdlnN: "
+                                  "nonzero and nonimplemented");
     }
 
     //! Get the array of log concentration-like derivatives of the
@@ -343,7 +335,7 @@ public:
      *                         log Activity Coefficients. length = m_kk
      */
     virtual void getdlnActCoeffdlnX(doublereal* dlnActCoeffdlnX) const {
-        err("getdlnActCoeffdlnX");
+        throw NotImplementedError("GibbsExcessVPSSTP::getdlnActCoeffdlnX");
     }
 
     //@}
@@ -374,7 +366,7 @@ public:
      *                Length = m_kk. units are m^3/kmol.
      */
     virtual void getPartialMolarVolumes(doublereal* vbar) const;
-    virtual const vector_fp& getPartialMolarVolumes() const;
+    virtual const vector_fp& getPartialMolarVolumesVector() const;
 
     /**
      * @}
@@ -463,9 +455,7 @@ public:
      * and subclasses that do not require initialization do not
      * need to overload this method.  When importing a CTML phase
      * description, this method is called just prior to returning
-     * from function importPhase.
-     *
-     * @see importCTML.cpp
+     * from function importPhase().
      */
     virtual void initThermo();
 
@@ -474,14 +464,6 @@ private:
     //! been identified.
     void initLengths();
 
-    //! Error function
-    /*!
-     *  Print an error string and exit
-     *
-     * @param msg  Message to be printed
-     */
-    doublereal err(const std::string& msg) const;
-
 protected:
     //! utility routine to check mole fraction sum
     /*!
@@ -489,7 +471,6 @@ protected:
      */
     double checkMFSum(const doublereal* const x) const;
 
-protected:
     //! Storage for the current values of the mole fractions of the species
     /*!
      * This vector is kept up-to-date when the setState functions are called.

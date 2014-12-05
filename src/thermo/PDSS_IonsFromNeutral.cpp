@@ -10,12 +10,8 @@
  */
 
 #include "cantera/thermo/PDSS_IonsFromNeutral.h"
-#include "cantera/thermo/ThermoFactory.h"
 #include "cantera/thermo/IonsFromNeutralVPSSTP.h"
-#include "cantera/thermo/VPStandardStateTP.h"
 #include "cantera/base/stringUtils.h"
-#include "cantera/base/ct_defs.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/ctml.h"
 
 #include <fstream>
@@ -123,7 +119,7 @@ void PDSS_IonsFromNeutral::constructPDSSXML(VPStandardStateTP* tp, size_t spinde
         throw CanteraError("PDSS_IonsFromNeutral::constructPDSSXML",
                            "no thermo Node for species " + speciesNode.name());
     }
-    std::string model = lowercase((*tn)["model"]);
+    std::string model = lowercase(tn->attrib("model"));
     if (model != "ionfromneutral") {
         throw CanteraError("PDSS_IonsFromNeutral::constructPDSSXML",
                            "thermo model for species isn't IonsFromNeutral: "
@@ -206,11 +202,6 @@ void PDSS_IonsFromNeutral::constructPDSSFile(VPStandardStateTP* tp, size_t spind
     delete fxml;
 }
 
-void PDSS_IonsFromNeutral::initThermoXML(const XML_Node& phaseNode, const std::string& id)
-{
-    PDSS::initThermoXML(phaseNode, id);
-}
-
 void PDSS_IonsFromNeutral::initThermo()
 {
     PDSS::initThermo();
@@ -218,14 +209,6 @@ void PDSS_IonsFromNeutral::initThermo()
     m_p0 = sp.refPressure(m_spindex);
     m_minTemp = m_spthermo->minTemp(m_spindex);
     m_maxTemp = m_spthermo->maxTemp(m_spindex);
-}
-
-doublereal
-PDSS_IonsFromNeutral::enthalpy_mole() const
-{
-    doublereal val = enthalpy_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
 }
 
 doublereal
@@ -249,13 +232,6 @@ PDSS_IonsFromNeutral::intEnergy_mole() const
 }
 
 doublereal
-PDSS_IonsFromNeutral::entropy_mole() const
-{
-    doublereal val = entropy_R();
-    return val * GasConstant;
-}
-
-doublereal
 PDSS_IonsFromNeutral::entropy_R() const
 {
     neutralMoleculePhase_->getEntropy_R(DATA_PTR(tmpNM));
@@ -271,14 +247,6 @@ PDSS_IonsFromNeutral::entropy_R() const
 }
 
 doublereal
-PDSS_IonsFromNeutral::gibbs_mole() const
-{
-    doublereal val = gibbs_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
-}
-
-doublereal
 PDSS_IonsFromNeutral::gibbs_RT() const
 {
     neutralMoleculePhase_->getGibbs_RT(DATA_PTR(tmpNM));
@@ -291,13 +259,6 @@ PDSS_IonsFromNeutral::gibbs_RT() const
         val += 2.0 * log(2.0);
     }
     return val;
-}
-
-doublereal
-PDSS_IonsFromNeutral::cp_mole() const
-{
-    doublereal val = cp_R();
-    return val * GasConstant;
 }
 
 doublereal
@@ -328,13 +289,6 @@ doublereal
 PDSS_IonsFromNeutral::density() const
 {
     return (m_pres * m_mw / (GasConstant * m_temp));
-}
-
-doublereal
-PDSS_IonsFromNeutral::cv_mole() const
-{
-    throw CanteraError("PDSS_IonsFromNeutral::cv_mole()", "unimplemented");
-    return 0.0;
 }
 
 doublereal
@@ -399,34 +353,6 @@ doublereal PDSS_IonsFromNeutral::molarVolume_ref() const
     return val;
 }
 
-doublereal  PDSS_IonsFromNeutral::pressure() const
-{
-    return m_pres;
-}
-
-void PDSS_IonsFromNeutral::setPressure(doublereal p)
-{
-    m_pres = p;
-}
-
-doublereal PDSS_IonsFromNeutral::critTemperature() const
-{
-    throw CanteraError("PDSS_IonsFromNeutral::critTemperature()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_IonsFromNeutral::critPressure() const
-{
-    throw CanteraError("PDSS_IonsFromNeutral::critPressure()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_IonsFromNeutral::critDensity() const
-{
-    throw CanteraError("PDSS_IonsFromNeutral::critDensity()", "unimplemented");
-    return 0.0;
-}
-
 doublereal PDSS_IonsFromNeutral::temperature() const
 {
     /*
@@ -449,13 +375,6 @@ void PDSS_IonsFromNeutral::setState_TP(doublereal temp, doublereal pres)
 
 void  PDSS_IonsFromNeutral::setState_TR(doublereal temp, doublereal rho)
 {
-}
-
-doublereal PDSS_IonsFromNeutral::satPressure(doublereal t)
-{
-    throw CanteraError("PDSS_IonsFromNeutral::satPressure()", "unimplemented");
-    /*NOTREACHED*/
-    return 0.0;
 }
 
 }

@@ -19,6 +19,8 @@
  */
 #include "cantera/thermo/IdealMolalSoln.h"
 #include "cantera/thermo/ThermoFactory.h"
+#include "cantera/base/ctml.h"
+#include <iostream>
 
 using namespace ctml;
 
@@ -56,8 +58,7 @@ IdealMolalSoln::IdealMolalSoln(const IdealMolalSoln& b) :
     *this = b;
 }
 
-IdealMolalSoln& IdealMolalSoln::
-operator=(const IdealMolalSoln& b)
+IdealMolalSoln& IdealMolalSoln::operator=(const IdealMolalSoln& b)
 {
     if (&b != this) {
         MolalityVPSSTP::operator=(b);
@@ -168,7 +169,7 @@ doublereal IdealMolalSoln::cp_mole() const
 
 doublereal IdealMolalSoln::cv_mole() const
 {
-    return err("not implemented");
+    throw NotImplementedError("IdealMolalSoln::cv_mole");
 }
 
 //
@@ -227,7 +228,6 @@ void IdealMolalSoln::setState_TP(doublereal temp, doublereal pres)
     Phase::setTemperature(temp);
     m_Pcurrent = pres;
     updateStandardStateThermo();
-    //m_densWaterSS = m_waterSS->density();
     calcDensity();
 }
 
@@ -267,12 +267,6 @@ doublereal IdealMolalSoln::standardConcentration(size_t k) const
         break;
     }
     return c0;
-}
-
-doublereal IdealMolalSoln::logStandardConc(size_t k) const
-{
-    double c0 = standardConcentration(k);
-    return log(c0);
 }
 
 void IdealMolalSoln::getUnitsStandardConc(double* uA, int k, int sizeUA) const
@@ -340,8 +334,7 @@ void IdealMolalSoln::getActivities(doublereal* ac) const
     }
 }
 
-void IdealMolalSoln::
-getMolalityActivityCoefficients(doublereal* acMolality) const
+void IdealMolalSoln::getMolalityActivityCoefficients(doublereal* acMolality) const
 {
     if (IMS_typeCutoff_ == 0) {
         for (size_t k = 0; k < m_kk; k++) {
@@ -670,32 +663,9 @@ void IdealMolalSoln::initThermoXML(XML_Node& phaseNode, const std::string& id_)
 
 }
 
-void IdealMolalSoln::setParameters(int n, doublereal* const c)
-{
-}
-
-void IdealMolalSoln::getParameters(int& n, doublereal* const c) const
-{
-}
-
-void IdealMolalSoln::setParametersFromXML(const XML_Node& eosdata)
-{
-}
-
 /*
  * ------------ Private and Restricted Functions ------------------
  */
-
-/*
- * Bail out of functions with an error exit if they are not
- * implemented.
- */
-doublereal IdealMolalSoln::err(const std::string& msg) const
-{
-    throw CanteraError("IdealMolalSoln",
-                       "Unfinished func called: " + msg);
-    return 0.0;
-}
 
 void  IdealMolalSoln::s_updateIMS_lnMolalityActCoeff() const
 {

@@ -20,14 +20,18 @@ from __future__ import print_function
 
 import sys
 
+def _printerr(*args):
+    # All debug and error output should go to stderr
+    print(*args, file=sys.stderr)
+
 class CTI_Error(Exception):
     """Exception raised if an error is encountered while
     parsing the input file.
     @ingroup pygroup"""
     def __init__(self, msg):
-        print('\n\n***** Error parsing input file *****\n\n')
-        print(msg)
-        print()
+        _printerr('\n\n***** Error parsing input file *****\n\n')
+        _printerr(msg)
+        _printerr()
 
 
 
@@ -250,6 +254,16 @@ def export_species(filename, fmt = 'CSV'):
     _valfmt = fmt
 
 def validate(species = 'yes', reactions = 'yes'):
+    """
+    Enable or disable validation of species and reactions.
+
+    :param species:
+        Set to ``'yes'`` (default) or ``'no'``.
+    :param reactions:
+        Set to ``'yes'`` (default) or ``'no'``. This controls duplicate reaction checks
+        and validation of rate expressions for some reaction types.
+
+    """
     global _valsp
     global _valrxn
     _valsp = species
@@ -386,7 +400,10 @@ def getAtomicComp(atoms):
     d = {}
     for t in toks:
         b = t.split(':')
-        d[b[0]] = int(b[1])
+        try:
+            d[b[0]] = int(b[1])
+        except ValueError:
+            d[b[0]] = float(b[1])
     return d
 
 def getReactionSpecies(s):
@@ -398,6 +415,10 @@ def getReactionSpecies(s):
     >>> getReactionSpecies(s)
     >>> {'CH3':1, 'H':3.7, 'O2':5.2}
     """
+
+    # Normalize formatting of falloff third bodies so that there is always as
+    # space following the '+', e.g. '(+M)' -> '(+ M)'
+    s = s.replace(' (+', ' (+ ')
 
     # get rid of the '+' signs separating species. Only plus signs
     # surrounded by spaces are replaced, so that plus signs may be
@@ -919,11 +940,11 @@ class transport(object):
 
 class gas_transport(transport):
     """
-    Species-specific Transport coefficients for ideal gas transport models.
+    Species-specific Transport coefficients for gas-phase transport models.
     """
     def __init__(self, geom = 'nonlin',
                  diam = 0.0, well_depth = 0.0, dipole = 0.0,
-                 polar = 0.0, rot_relax = 0.0):
+                 polar = 0.0, rot_relax = 0.0, acentric_factor = None):
         """
         :param geom:
             A string specifying the molecular geometry. One of ``atom``,
@@ -939,6 +960,9 @@ class gas_transport(transport):
         :param rot_relax:
             The rotational relaxation collision number at 298 K. Dimensionless.
             Default: 0.0
+        :param w_ac:
+            Pitzer's acentric factor.  Dimensionless.
+            Default: 0.0
         """
         self._geom = geom
         self._diam = diam
@@ -946,6 +970,7 @@ class gas_transport(transport):
         self._dipole = dipole
         self._polar = polar
         self._rot_relax = rot_relax
+        self._w_ac = acentric_factor
 
     def build(self, t):
         #t = s.addChild("transport")
@@ -958,6 +983,8 @@ class gas_transport(transport):
         addFloat(t, "dipoleMoment", (self._dipole, 'Debye'),'%8.3f')
         addFloat(t, "polarizability", (self._polar, 'A3'),'%8.3f')
         addFloat(t, "rotRelax", self._rot_relax,'%8.3f')
+        if self._w_ac is not None:
+            addFloat(t, "acentric_factor", self._w_ac, '%8.3f')
 
 class rate_expression(object):
     pass
@@ -980,8 +1007,11 @@ class Arrhenius(rate_expression):
             The temperature exponent. Dimensionless. Default: 0.0.
         :param E:
             Activation energy. Default: 0.0.
-        :param coverage:
-
+        :param coverage: For a single coverage dependency, a list with four
+            elements: the species name followed by the three coverage
+            parameters. For multiple coverage dependencies, a list of lists
+            containing the individual sets of coverage parameters. Only used for
+            surface and edge reactions.
         :param rate_type:
 
         :param n:
@@ -993,12 +1023,13 @@ class Arrhenius(rate_expression):
                             "temperature exponent. Specify one or the other.")
         elif n is not None and b == 0.0:
             b = n
-            print("Warning: Usage of n to specify the temperature exponent is "
-                  "deprecated and will be removed in a future version. Use b "
-                  "to specify the temperature exponent by keyword. Please check "
-                  "your cti file for places where the temperature exponent of "
-                  "the reaction rate is set by n = XXX and change them to "
-                  "b = XXX.")
+            _printerr(
+                "Warning: Usage of n to specify the temperature exponent is "
+                "deprecated and will be removed in a future version. Use b "
+                "to specify the temperature exponent by keyword. Please check "
+                "your cti file for places where the temperature exponent of "
+                "the reaction rate is set by n = XXX and change them to "
+                "b = XXX.")
 
         self._c = [A, b, E]
         self._type = rate_type
@@ -1008,6 +1039,9 @@ class Arrhenius(rate_expression):
                 self._cov = [coverage]
             else:
                 self._cov = coverage
+            for cov in self._cov:
+                if len(cov) != 4:
+                    raise CTI_Error("Incorrect number of coverage parameters")
         else:
             self._cov = None
 
@@ -1094,8 +1128,9 @@ class reaction(object):
             An optional identification string. If omitted, it defaults to a
             four-digit numeric string beginning with 0001 for the first
             reaction in the file.
-        :param options:
-            Processing options, as described in :ref:`sec-phase-options`.
+        :param options: Processing options, as described in
+            :ref:`sec-reaction-options`. May be one or more (as a list) of the
+            following: 'skip', 'duplicate', 'negative_A', 'negative_orders'.
         """
         self._id = id
         self._e = equation
@@ -1184,11 +1219,12 @@ class reaction(object):
         else:
             r['reversible'] = 'no'
 
-        for s in self._options:
-            if s == 'duplicate':
-                r['duplicate'] = 'yes'
-            elif s == 'negative_A':
-                r['negative_A'] = 'yes'
+        if 'duplicate' in self._options:
+            r['duplicate'] = 'yes'
+        if 'negative_A' in self._options:
+            r['negative_A'] = 'yes'
+        if 'negative_orders' in self._options:
+            r['negative_orders'] = 'yes'
 
         ee = self._e.replace('<','[').replace('>',']')
         r.addChild('equation',ee)
@@ -1303,8 +1339,8 @@ class three_body_reaction(reaction):
             An optional identification string. If omitted, it defaults to a
             four-digit numeric string beginning with 0001 for the first
             reaction in the file.
-        :param options:
-            Processing options, as described in :ref:`sec-phase-options`.
+        :param options: Processing options, as described in
+            :ref:`sec-reaction-options`.
         """
         reaction.__init__(self, equation, kf, id, '', options)
         self._type = 'threeBody'
@@ -1392,7 +1428,7 @@ class falloff_reaction(pdep_reaction):
             four-digit numeric string beginning with 0001 for the first
             reaction in the file.
         :param options:
-            Processing options, as described in :ref:`sec-phase-options`.
+            Processing options, as described in :ref:`sec-reaction-options`.
         """
         kf2 = (kf, kf0)
         reaction.__init__(self, equation, kf2, id, '', options)
@@ -1435,7 +1471,7 @@ class chemically_activated_reaction(pdep_reaction):
             four-digit numeric string beginning with 0001 for the first
             reaction in the file.
         :param options:
-            Processing options, as described in :ref:`sec-phase-options`.
+            Processing options, as described in :ref:`sec-reaction-options`.
         """
         reaction.__init__(self, equation, (kLow, kHigh), id, '', options)
         self._type = 'chemAct'
@@ -1510,8 +1546,9 @@ class chebyshev_reaction(reaction):
         self.coeffs = coeffs
 
         # clean up reactant and product lists
-        del self._r['(+']
-        del self._p['(+']
+        if '(+' in self._r:
+            del self._r['(+']
+            del self._p['(+']
         if 'M)' in self._r:
             del self._r['M)']
             del self._p['M)']
@@ -1564,7 +1601,7 @@ class surface_reaction(reaction):
             four-digit numeric string beginning with 0001 for the first
             reaction in the file.
         :param options:
-            Processing options, as described in :ref:`sec-phase-options`.
+            Processing options, as described in :ref:`sec-reaction-options`.
         """
         reaction.__init__(self, equation, kf, id, order, options)
         self._type = 'surface'
@@ -1887,9 +1924,9 @@ class ideal_gas(phase):
         self._kin = kinetics
         self._tr = transport
         if self.debug:
-            print('Read ideal_gas entry '+self._name)
+            _printerr('Read ideal_gas entry '+self._name)
             try:
-                print('in file '+__name__)
+                _printerr('in file '+__name__)
             except:
                 pass
 
@@ -2055,7 +2092,7 @@ class incompressible_solid(phase):
                  elements = '',
                  species = '',
                  note = '',
-                 density = -1.0,
+                 density = None,
                  transport = 'None',
                  initial_state = None,
                  options = []):
@@ -2064,7 +2101,7 @@ class incompressible_solid(phase):
                        initial_state, options)
         self._dens = density
         self._pure = 0
-        if self._dens < 0.0:
+        if self._dens is None:
             raise CTI_Error('density must be specified.')
         self._tr = transport
 
@@ -2093,7 +2130,7 @@ class lattice(phase):
                  transport = 'None',
                  initial_state = None,
                  options = [],
-                 site_density = -1.0,
+                 site_density = None,
                  vacancy_species = ''):
         phase.__init__(self, name, 3, elements, species, note, 'none',
                         initial_state, options)
@@ -2105,7 +2142,7 @@ class lattice(phase):
             raise CTI_Error('sublattice name must be specified')
         if species == '':
             raise CTI_Error('sublattice species must be specified')
-        if site_density < 0.0:
+        if site_density is None:
             raise CTI_Error('sublattice '+name
                             +' site density must be specified')
 
@@ -2228,19 +2265,19 @@ class RedlichKwongMFTP(phase):
                  elements = '',
                  species = '',
                  note = '',
+                 reactions = 'none',
+                 kinetics = 'GasKinetics',
                  initial_state = None,
                  activity_coefficients = None,
                  transport = 'None',
                  options = []):
 
-        phase.__init__(self,name, 3, elements, species, note, 'none',
+        phase.__init__(self,name, 3, elements, species, note, reactions,
                        initial_state,options)
         self._pure = 0
+        self._kin = kinetics
         self._tr = transport
         self._activityCoefficients = activity_coefficients
-
-    def conc_dim(self):
-        return (0,0)
 
     def build(self, p):
         ph = phase.build(self,p)
@@ -2258,8 +2295,9 @@ class RedlichKwongMFTP(phase):
         if self._tr:
             t = ph.addChild('transport')
             t['model'] = self._tr
-        k = ph.addChild("kinetics")
-        k['model'] = 'none'
+        if self._kin:
+            k = ph.addChild("kinetics")
+            k['model'] = self._kin
 
 
 class redlich_kwong(phase):
@@ -2589,47 +2627,66 @@ class Lindemann(object):
 #get_atomic_wts()
 validate()
 
-def convert(filename, outName=None):
+def convert(filename=None, outName=None, text=None):
     import os
-    base = os.path.basename(filename)
-    root, _ = os.path.splitext(base)
-    dataset(root)
+    if filename is not None:
+        filename = os.path.expanduser(filename)
+        base = os.path.basename(filename)
+        root, _ = os.path.splitext(base)
+        dataset(root)
+    elif outName is None:
+        outName = 'STDOUT'
+
     try:
-        with open(filename, 'rU') as f:
-            code = compile(f.read(), filename, 'exec')
-            exec(code)
+        if filename is not None:
+            with open(filename, 'rU') as f:
+                code = compile(f.read(), filename, 'exec')
+        else:
+            code = compile(text, '<string>', 'exec')
+        exec(code)
     except SyntaxError as err:
         # Show more context than the default SyntaxError message
         # to help see problems in multi-line statements
-        text = open(filename, 'rU').readlines()
-        print('%s in "%s" on line %i:\n' % (err.__class__.__name__,
-                                            err.filename,
-                                            err.lineno))
-        print('|  Line |')
+        if filename:
+            text = open(filename, 'rU').readlines()
+        else:
+            text = text.split('\n')
+        _printerr('%s in "%s" on line %i:\n' % (err.__class__.__name__,
+                                                err.filename,
+                                                err.lineno))
+        _printerr('|  Line |')
         for i in range(max(err.lineno-6, 0),
                        min(err.lineno+3, len(text))):
-            print('| % 5i |' % (i+1), text[i].rstrip())
+            _printerr('| % 5i |' % (i+1), text[i].rstrip())
             if i == err.lineno-1:
-                print(' '* (err.offset+9) + '^')
-        print()
+                _printerr(' '* (err.offset+9) + '^')
+        _printerr()
         sys.exit(3)
-    except TypeError as err:
+    except Exception as err:
         import traceback
 
-        text = open(filename, 'rU').readlines()
+        if filename:
+            text = open(filename, 'rU').readlines()
+        else:
+            text = text.split('\n')
+            filename = '<string>'
         tb = traceback.extract_tb(sys.exc_info()[2])
         lineno = tb[-1][1]
+        if tb[-1][0] == filename:
+            # Error in input file
+            _printerr('%s on line %i of %s:' % (err.__class__.__name__, lineno, filename))
+            _printerr(err)
+            _printerr('\n| Line |')
 
-        print('%s on line %i of %s:' % (err.__class__.__name__, lineno, filename))
-        print(err)
-        print('\n| Line |')
-
-        for i in range(max(lineno-6, 0),
-                       min(lineno+3, len(text))):
-            if i == lineno-1:
-                print('> % 4i >' % (i+1), text[i].rstrip())
-            else:
-                print('| % 4i |' % (i+1), text[i].rstrip())
+            for i in range(max(lineno-6, 0),
+                           min(lineno+3, len(text))):
+                if i == lineno-1:
+                    _printerr('> % 4i >' % (i+1), text[i].rstrip())
+                else:
+                    _printerr('| % 4i |' % (i+1), text[i].rstrip())
+        else:
+            # Error in ctml_writer or elsewhere
+            traceback.print_exc()
 
         sys.exit(4)
 

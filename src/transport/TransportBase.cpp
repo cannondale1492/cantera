@@ -2,16 +2,7 @@
  *  @file TransportBase.cpp
  *  Mixture-averaged transport properties for ideal gas mixtures.
  */
-#include "cantera/thermo/ThermoPhase.h"
-#include "cantera/transport/LiquidTransport.h"
-#include "cantera/base/ctexceptions.h"
-
-#include "cantera/base/utilities.h"
-#include "cantera/transport/LiquidTransportParams.h"
-#include "cantera/transport/TransportFactory.h"
-#include "cantera/base/stringUtils.h"
-
-#include "cantera/numerics/ctlapack.h"
+#include "cantera/transport/TransportBase.h"
 
 using namespace std;
 
@@ -85,7 +76,7 @@ void Transport::checkSpeciesArraySize(size_t kk) const
 void Transport::setParameters(const int type, const int k,
                               const doublereal* const p)
 {
-    err("setParameters");
+    throw NotImplementedError("Transport::setParameters");
 }
 
 void Transport::setThermo(thermo_t& thermo)
@@ -94,14 +85,14 @@ void Transport::setThermo(thermo_t& thermo)
         m_thermo = &thermo;
         m_nsp = m_thermo->nSpecies();
     } else  {
-        int newNum = thermo.nSpecies();
-        int oldNum = m_thermo->nSpecies();
+        size_t newNum = thermo.nSpecies();
+        size_t oldNum = m_thermo->nSpecies();
         if (newNum != oldNum) {
             throw CanteraError("Transport::setThermo",
                                "base object cannot be changed after "
                                "the transport manager has been constructed because num species isn't the same.");
         }
-        for (int i = 0; i < newNum; i++) {
+        for (size_t i = 0; i < newNum; i++) {
             std::string newS0 = thermo.speciesName(i);
             std::string oldS0 = m_thermo->speciesName(i);
             if (newNum != oldNum) {
@@ -112,17 +103,6 @@ void Transport::setThermo(thermo_t& thermo)
         }
         m_thermo = &thermo;
     }
-}
-
-doublereal Transport::err(const std::string& msg) const
-{
-
-    throw CanteraError("Transport Base Class",
-                       "\n\n\n**** Method "+ msg +" not implemented in model "
-                       + int2str(model()) + " ****\n"
-                       "(Did you forget to specify a transport model?)\n\n\n");
-
-    return 0.0;
 }
 
 void Transport::finalize()
@@ -138,6 +118,6 @@ void Transport::getSpeciesFluxes(size_t ndim, const doublereal* const grad_T,
                                  size_t ldx, const doublereal* const grad_X,
                                  size_t ldf, doublereal* const fluxes)
 {
-    err("getSpeciesFluxes");
+    throw NotImplementedError("Transport::getSpeciesFluxes");
 }
 }

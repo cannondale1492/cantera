@@ -17,7 +17,6 @@
 
 #include "cantera/base/stringUtils.h"
 #include "cantera/base/ctexceptions.h"
-#include "cantera/base/global.h"
 #include "cantera/base/ctml.h"
 
 #include <sstream>
@@ -54,6 +53,22 @@ std::string int2str(const size_t n)
     ss << n;
     return ss.str();
 }
+
+std::string vec2str(const vector_fp& v, const std::string& fmt,
+                    const std::string& sep)
+{
+    char buf[64];
+    std::stringstream o;
+    for (size_t i = 0; i < v.size(); i++) {
+        SNPRINTF(buf, 63, fmt.c_str(), v[i]);
+        o << v[i];
+        if (i != v.size() - 1) {
+            o << sep;
+        }
+    }
+    return o.str();
+}
+
 
 std::string lowercase(const std::string& s)
 {
@@ -124,39 +139,34 @@ compositionMap parseCompString(const std::string& ss,
     for (size_t k = 0; k < names.size(); k++) {
         x[names[k]] = 0.0;
     }
-    std::string s = ss;
-    std::string num;
-    do {
-        size_t ibegin = s.find_first_not_of(", ;\n\t");
-        if (ibegin != std::string::npos) {
-            s = s.substr(ibegin,s.size());
-            size_t icolon = s.find(':');
-            size_t iend = s.find_first_of(", ;\n\t");
-            //icomma = s.find(',');
-            if (icolon != std::string::npos) {
-                std::string name = stripws(s.substr(0, icolon));
-                if (iend != std::string::npos) {
-                    num = s.substr(icolon+1, iend-icolon);
-                    s = s.substr(iend+1, s.size());
-                } else {
-                    num = s.substr(icolon+1, s.size());
-                    s = "";
-                }
-                if (x.find(name) == x.end()) {
-                    throw CanteraError("parseCompString",
-                                       "unknown species " + name);
-                }
-                x[name] = fpValue(num);
-            } else {
-                s = "";
-            }
+
+    size_t start = 0;
+    size_t stop = 0;
+    while (stop < ss.size()) {
+        size_t colon = ss.find(':', start);
+        if (colon == npos) {
+            break;
         }
-    } while (s != "");
+        size_t valstart = ss.find_first_not_of(" \t\n", colon+1);
+        stop = ss.find_first_of(", ;\n\t", valstart);
+        std::string name = stripws(ss.substr(start, colon-start));
+        if (!names.empty() && x.find(name) == x.end()) {
+            throw CanteraError("parseCompString",
+                "unknown species '" + name + "'");
+        }
+        x[name] = fpValueCheck(ss.substr(valstart, stop-colon-1));
+        start = ss.find_first_not_of(", ;\n\t", stop+1);
+    }
+    if (stop != npos && !stripws(ss.substr(stop)).empty()) {
+        throw CanteraError("parseCompString", "Found non-key:value data "
+            "in composition string: '" + ss.substr(stop) + "'");
+    }
     return x;
 }
 
 void split(const std::string& ss, std::vector<std::string>& w)
 {
+    warn_deprecated("split", "To be removed after Cantera 2.2.");
     std::string s = ss;
     std::string::size_type ibegin, iend;
     std::string name, num, nm;
@@ -179,6 +189,7 @@ void split(const std::string& ss, std::vector<std::string>& w)
 int fillArrayFromString(const std::string& str,
                         doublereal* const a, const char delim)
 {
+    warn_deprecated("fillArrayFromString", "To be removed after Cantera 2.2.");
     std::string::size_type iloc;
     int count = 0;
     std::string num;
@@ -200,6 +211,7 @@ int fillArrayFromString(const std::string& str,
 
 std::string getBaseName(const std::string& path)
 {
+    warn_deprecated("getBaseName", "To be removed after Cantera 2.2.");
     std::string file;
     size_t idot = path.find_last_of('.');
     size_t islash = path.find_last_of('/');
@@ -252,6 +264,10 @@ doublereal fpValueCheck(const std::string& val)
                 throw CanteraError("fpValueCheck",
                                    "string has more than one .");
             }
+            if (numExp > 0) {
+                throw CanteraError("fpValueCheck",
+                                   "string has decimal point in exponent");
+            }
         } else if (ch == 'e' || ch == 'E' || ch == 'd' || ch == 'D') {
             numExp++;
             str[i] = 'E';
@@ -273,6 +289,7 @@ doublereal fpValueCheck(const std::string& val)
 //=====================================================================================================================
 std::string logfileName(const std::string& infile)
 {
+    warn_deprecated("logfileName", "To be removed after Cantera 2.2.");
     std::string logfile = getBaseName(infile);
     logfile += ".log";
     return logfile;
@@ -321,47 +338,6 @@ std::string parseSpeciesName(const std::string& nameStr, std::string& phaseName)
         }
     }
     return s;
-}
-
-int stripLTWScstring(char str[])
-{
-    warn_deprecated("stripLTWScstring");
-    int  i = 0, j = 0;
-    char ch;
-    const char COM_CHAR='\0';
-    /*
-     *    Quick Returns
-     */
-    if ((str == 0) || (str[0] == '\0')) {
-        return 0;
-    }
-
-    /* Find first non-space character character */
-    while (((ch = str[i]) != '\0') && isspace(ch)) {
-        i++;
-    }
-
-    /*
-     * Move real part of str to the front by copying the string
-     *   - Comments are handled here, by terminating the copy at the
-     *     first comment indicator, and inserting the null character at
-     *     that point.
-     */
-
-    while ((ch = str[j+i]) != '\0' &&
-            (ch != COM_CHAR)) {
-        str[j] = ch;
-        j++;
-    }
-    str[j] = '\0';
-    j--;
-    /* Remove trailing white space by inserting a null character */
-    while ((j != -1) && isspace(str[j])) {
-        j--;
-    }
-    j++;
-    str[j] = '\0';
-    return j;
 }
 
 doublereal strSItoDbl(const std::string& strSI)

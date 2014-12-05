@@ -8,7 +8,6 @@
  *  See file License.txt for licensing information
  */
 
-#include "cantera/thermo/ThermoPhase.h"
 #include "cantera/transport/DustyGasTransport.h"
 #include "cantera/base/stringUtils.h"
 
@@ -110,7 +109,7 @@ void DustyGasTransport::setThermo(thermo_t& thermo)
 
 void DustyGasTransport::setParameters(const int type, const int k, const doublereal* const p)
 {
-    warn_deprecated("DustyGasTransport::setParameters");
+    warn_deprecated("DustyGasTransport::setParameters", "To be removed after Cantera 2.2");
     switch (type) {
     case 0:
         setPorosity(p[0]);

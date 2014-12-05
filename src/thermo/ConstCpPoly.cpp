@@ -6,7 +6,7 @@
  */
 // Copyright 2001  California Institute of Technology
 
-#include "ConstCpPoly.h"
+#include "cantera/thermo/ConstCpPoly.h"
 
 namespace Cantera
 {
@@ -120,7 +120,7 @@ doublereal ConstCpPoly::reportHf298(doublereal* const h298) const
     return h;
 }
 
-void ConstCpPoly::modifyOneHf298(const size_t& k, const doublereal Hf298New)
+void ConstCpPoly::modifyOneHf298(const size_t k, const doublereal Hf298New)
 {
     if (k != m_index) {
         return;

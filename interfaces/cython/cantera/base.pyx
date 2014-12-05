@@ -1,9 +1,10 @@
 cdef class _SolutionBase:
-    def __cinit__(self, infile='', phaseid='', phases=(), source=None):
+    def __cinit__(self, infile='', phaseid='', phases=(), origin=None,
+                  source=None):
         # Shallow copy of an existing Solution (for slicing support)
         cdef _SolutionBase other
-        if source is not None:
-            other = <_SolutionBase?>source
+        if origin is not None:
+            other = <_SolutionBase?>origin
 
             # keep a reference to the parent to prevent the underlying
             # C++ objects from being deleted
@@ -18,7 +19,12 @@ cdef class _SolutionBase:
             return
 
         # Instantiate a set of new Cantera C++ objects
-        rootNode = getCtmlTree(stringify(infile))
+        if infile:
+            rootNode = CxxGetXmlFile(stringify(infile))
+        elif source:
+            rootNode = CxxGetXmlFromString(stringify(source))
+        else:
+            raise ValueError('No phase definition provided')
 
         # Get XML data
         cdef XML_Node* phaseNode
@@ -58,7 +64,7 @@ cdef class _SolutionBase:
             assert self.transport is not NULL
 
     def __getitem__(self, selection):
-        copy = self.__class__(source=self)
+        copy = self.__class__(origin=self)
         if isinstance(selection, slice):
             selection = range(selection.start or 0,
                               selection.stop or self.n_species,
@@ -75,6 +81,12 @@ cdef class _SolutionBase:
             self._selected_species.resize(len(species))
             for i,spec in enumerate(species):
                 self._selected_species[i] = self.species_index(spec)
+
+    def __reduce__(self):
+        raise NotImplementedError('Solution object is not picklable')
+
+    def __copy__(self):
+        raise NotImplementedError('Solution object is not copyable')
 
     def __dealloc__(self):
         # only delete the C++ objects if this is the parent object

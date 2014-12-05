@@ -3,7 +3,6 @@
  */
 
 #include "cantera/oneD/Domain1D.h"
-#include "cantera/oneD/OneDim.h"
 #include "cantera/oneD/MultiJac.h"
 #include "cantera/base/ctml.h"
 
@@ -49,9 +48,8 @@ void Domain1D::needJacUpdate()
     }
 }
 
-void Domain1D::
-eval(size_t jg, doublereal* xg, doublereal* rg,
-     integer* mask, doublereal rdt)
+void Domain1D::eval(size_t jg, doublereal* xg, doublereal* rg,
+                    integer* mask, doublereal rdt)
 {
 
     if (jg != npos && (jg + 1 < firstPoint() || jg > lastPoint() + 1)) {
@@ -111,8 +109,7 @@ XML_Node& Domain1D::save(XML_Node& o, const doublereal* const sol)
 void Domain1D::restore(const XML_Node& dom, doublereal* soln, int loglevel)
 {
     vector_fp values;
-    vector<XML_Node*> nodes;
-    dom.getChildren("floatArray", nodes);
+    vector<XML_Node*> nodes = dom.getChildren("floatArray");
     for (size_t i = 0; i < nodes.size(); i++) {
         string title = nodes[i]->attrib("title");
         getFloatArray(*nodes[i], values, false);
@@ -160,28 +157,21 @@ void Domain1D::setupGrid(size_t n, const doublereal* z)
     }
 }
 
-void drawline()
-{
-    writelog("\n-------------------------------------"
-             "------------------------------------------");
-}
-
 void Domain1D::showSolution(const doublereal* x)
 {
     size_t nn = m_nv/5;
     size_t i, j, n;
-    //char* buf = new char[100];
     char buf[100];
     doublereal v;
     for (i = 0; i < nn; i++) {
-        drawline();
+        writeline('-', 79, false, true);
         sprintf(buf, "\n        z   ");
         writelog(buf);
         for (n = 0; n < 5; n++) {
             sprintf(buf, " %10s ",componentName(i*5 + n).c_str());
             writelog(buf);
         }
-        drawline();
+        writeline('-', 79, false, true);
         for (j = 0; j < m_points; j++) {
             sprintf(buf, "\n %10.4g ",m_z[j]);
             writelog(buf);
@@ -194,14 +184,14 @@ void Domain1D::showSolution(const doublereal* x)
         writelog("\n");
     }
     size_t nrem = m_nv - 5*nn;
-    drawline();
+    writeline('-', 79, false, true);
     sprintf(buf, "\n        z   ");
     writelog(buf);
     for (n = 0; n < nrem; n++) {
         sprintf(buf, " %10s ", componentName(nn*5 + n).c_str());
         writelog(buf);
     }
-    drawline();
+    writeline('-', 79, false, true);
     for (j = 0; j < m_points; j++) {
         sprintf(buf, "\n %10.4g ",m_z[j]);
         writelog(buf);

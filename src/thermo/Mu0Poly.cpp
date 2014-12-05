@@ -6,10 +6,7 @@
  *  (see \ref spthermo and class \link Cantera::Mu0Poly Mu0Poly\endlink).
  */
 #include "cantera/thermo/Mu0Poly.h"
-#include "cantera/base/ctexceptions.h"
-#include "cantera/thermo/speciesThermoTypes.h"
 #include "cantera/thermo/SpeciesThermo.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/ctml.h"
 #include "cantera/base/stringUtils.h"
 
@@ -66,9 +63,8 @@ Mu0Poly::duplMyselfAsSpeciesThermoInterpType() const
     return new Mu0Poly(*this);
 }
 
-void  Mu0Poly::
-updateProperties(const doublereal* tt,  doublereal* cp_R,
-                 doublereal* h_RT, doublereal* s_R) const
+void  Mu0Poly::updateProperties(const doublereal* tt,  doublereal* cp_R,
+                                doublereal* h_RT, doublereal* s_R) const
 {
     size_t j = m_numIntervals;
     double T = *tt;
@@ -88,11 +84,10 @@ updateProperties(const doublereal* tt,  doublereal* cp_R,
     s_R[m_index]  = m_s0_R_int[j] + cp_Rj * (log(T/T1));
 }
 
-void  Mu0Poly::
-updatePropertiesTemp(const doublereal T,
-                     doublereal* cp_R,
-                     doublereal* h_RT,
-                     doublereal* s_R) const
+void Mu0Poly::updatePropertiesTemp(const doublereal T,
+                                   doublereal* cp_R,
+                                   doublereal* h_RT,
+                                   doublereal* s_R) const
 {
     updateProperties(&T, cp_R, h_RT, s_R);
 }
@@ -122,14 +117,11 @@ void Mu0Poly::modifyParameters(doublereal* coeffs)
     processCoeffs(coeffs);
 }
 
-void installMu0ThermoFromXML(const std::string& speciesName,
-                             SpeciesThermo& sp, size_t k,
-                             const XML_Node* Mu0Node_ptr)
+Mu0Poly* newMu0ThermoFromXML(const std::string& speciesName,
+                             const XML_Node& Mu0Node)
 {
-
     doublereal tmin, tmax;
     bool dimensionlessMu0Values = false;
-    const XML_Node& Mu0Node = *Mu0Node_ptr;
 
     tmin = fpValue(Mu0Node["Tmin"]);
     tmax = fpValue(Mu0Node["Tmax"]);
@@ -159,7 +151,7 @@ void installMu0ThermoFromXML(const std::string& speciesName,
      * form. If they were, then the assumed temperature needs to be
      * adjusted from the assumed T = 273.15
      */
-    string uuu = (*valNode_ptr)["units"];
+    string uuu = valNode_ptr->attrib("units");
     if (uuu == "Dimensionless") {
         dimensionlessMu0Values = true;
     }
@@ -205,7 +197,7 @@ void installMu0ThermoFromXML(const std::string& speciesName,
         c[2+i*2+1] = cValues[i];
     }
 
-    sp.install(speciesName, k, MU0_INTERP, &c[0], tmin, tmax, pref);
+    return new Mu0Poly(0, tmin, tmax, pref, &c[0]);
 }
 
 void Mu0Poly::processCoeffs(const doublereal* coeffs)

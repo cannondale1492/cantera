@@ -6,17 +6,13 @@
 #ifndef CT_STFLOW_H
 #define CT_STFLOW_H
 
-#include "cantera/transport/TransportBase.h"
 #include "Domain1D.h"
 #include "cantera/base/Array.h"
 #include "cantera/thermo/IdealGasPhase.h"
 #include "cantera/kinetics/Kinetics.h"
-#include "cantera/numerics/funcs.h"
 
 namespace Cantera
 {
-class MultiJac;
-
 //------------------------------------------
 //   constants
 //------------------------------------------
@@ -32,6 +28,8 @@ const size_t c_offset_Y = 4;    // mass fractions
 const int c_Mixav_Transport = 0;
 const int c_Multi_Transport = 1;
 const int c_Soret = 2;
+
+class Transport;
 
 /**
  *  This class represents 1D flow domains that satisfy the one-dimensional
@@ -97,16 +95,6 @@ public:
     //! The current pressure [Pa].
     doublereal pressure() const {
         return m_press;
-    }
-
-    //! @deprecated unused
-    virtual void setState(size_t point, const doublereal* state,
-                          doublereal* x) {
-        warn_deprecated("StFlow::setState");
-        setTemperature(point, state[2]);
-        for (size_t k = 0; k < m_nsp; k++) {
-            setMassFraction(point, k, state[4+k]);
-        }
     }
 
     //! Write the initial solution estimate into array x.
@@ -183,17 +171,26 @@ public:
     }
 
     void solveEnergyEqn(size_t j=npos) {
+        bool changed = false;
         if (j == npos)
             for (size_t i = 0; i < m_points; i++) {
+                if (!m_do_energy[i]) {
+                    changed = true;
+                }
                 m_do_energy[i] = true;
             }
         else {
+            if (!m_do_energy[j]) {
+                changed = true;
+            }
             m_do_energy[j] = true;
         }
         m_refiner->setActive(0, true);
         m_refiner->setActive(1, true);
         m_refiner->setActive(2, true);
-        needJacUpdate();
+        if (changed) {
+            needJacUpdate();
+        }
     }
 
 	///Turn radiation on / off
@@ -231,17 +228,26 @@ public:
 	}
 
     void fixTemperature(size_t j=npos) {
+        bool changed = false;
         if (j == npos)
             for (size_t i = 0; i < m_points; i++) {
+                if (m_do_energy[i]) {
+                    changed = true;
+                }
                 m_do_energy[i] = false;
             }
         else {
+            if (m_do_energy[j]) {
+                changed = true;
+            }
             m_do_energy[j] = false;
         }
         m_refiner->setActive(0, false);
         m_refiner->setActive(1, false);
         m_refiner->setActive(2, false);
-        needJacUpdate();
+        if (changed) {
+            needJacUpdate();
+        }
     }
 
     bool doSpecies(size_t k) {

@@ -16,12 +16,10 @@
 #define CT_REDLICHKWONGMFTP_H
 
 #include "MixtureFugacityTP.h"
+#include "cantera/base/Array.h"
 
 namespace Cantera
 {
-
-class XML_Node;
-
 /**
  * @ingroup thermoprops
  *
@@ -110,14 +108,8 @@ public:
     /// Molar enthalpy. Units: J/kmol.
     virtual doublereal enthalpy_mole() const;
 
-    /// Molar internal energy. Units: J/kmol.
-    virtual doublereal intEnergy_mole() const;
-
     /// Molar entropy. Units: J/kmol/K.
     virtual doublereal entropy_mole() const;
-
-    /// Molar Gibbs function. Units: J/kmol.
-    virtual doublereal gibbs_mole() const;
 
     /// Molar heat capacity at constant pressure. Units: J/kmol/K.
     virtual doublereal cp_mole() const;
@@ -141,14 +133,6 @@ public:
      */
     virtual doublereal pressure() const;
 
-    //! Returns  the isothermal compressibility. Units: 1/Pa.
-    /*!
-     * The isothermal compressibility is defined as
-     * \f[
-     * \kappa_T = -\frac{1}{v}\left(\frac{\partial v}{\partial P}\right)_T
-     * \f]
-     */
-    virtual doublereal isothermalCompressibility() const;
     // @}
 
 protected:
@@ -269,13 +253,6 @@ public:
      */
     virtual doublereal standardConcentration(size_t k=0) const;
 
-    //! Returns the natural logarithm of the standard
-    //! concentration of the kth species
-    /*!
-     * @param k    index of the species. (defaults to zero)
-     */
-    virtual doublereal logStandardConc(size_t k=0) const;
-
     //! Returns the units of the standard and generalized concentrations.
     /*!
      * Note they have the same units, as their
@@ -394,6 +371,12 @@ public:
 
     /// Critical pressure (Pa).
     virtual doublereal critPressure() const;
+    
+    /// Critical volume (m3/kmol)
+    virtual doublereal critVolume() const;
+    
+    // Critical compressibility (unitless)
+    virtual doublereal critCompressibility() const;
 
     /// Critical density (kg/m3).
     virtual doublereal critDensity() const;
@@ -406,18 +389,15 @@ public:
      * The following methods are used in the process of constructing
      * the phase and setting its parameters from a specification in an
      * input file. They are not normally used in application programs.
-     * To see how they are used, see files importCTML.cpp and
-     * ThermoFactory.cpp.
+     * To see how they are used, see importPhase().
      */
     //@{
 
     //! Set equation of state parameter values from XML entries.
     /*!
-     *  This method is called by function importPhase in
-     *  file importCTML.cpp when processing a phase definition in
-     *  an input file. It should be overloaded in subclasses to set
-     *  any parameters that are specific to that particular phase
-     *  model.
+     * This method is called by function importPhase() when processing a phase
+     * definition in an input file. It should be overloaded in subclasses to set
+     * any parameters that are specific to that particular phase model.
      *
      * @param thermoNode An XML_Node object corresponding to
      *                   the "thermo" entry for this phase in the input file.
@@ -435,8 +415,6 @@ public:
      * need to overload this method.  When importing a CTML phase
      * description, this method is called just prior to returning
      * from function importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 

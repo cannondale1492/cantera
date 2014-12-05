@@ -13,6 +13,7 @@
 
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
 
 namespace Cantera
 {
@@ -31,9 +32,7 @@ using std::fabs;
  */
 // \cond
 static const doublereal  T_c = 647.096;  // Kelvin
-static const doublereal  P_c = 22.064E6; // Pascals
 static const doublereal  Rho_c = 322.;    // kg m-3
-static const doublereal  M_water = 18.015268; // kg kmol-1
 //  \endcond
 
 /*
@@ -1066,9 +1065,7 @@ doublereal  WaterPropsIAPWSphi::dfind(doublereal  p_red, doublereal  tau, double
         if (n < 10) {
             dpdx = dpddelta * 1.1;
         }
-        if (dpdx < 0.001) {
-            dpdx = 0.001;
-        }
+        dpdx = std::max(dpdx, 0.001);
 
         /*
          * Formulate the update to reduced density using
@@ -1151,7 +1148,6 @@ doublereal  WaterPropsIAPWSphi::cp_R() const
     doublereal  tau   = TAUsave;
     doublereal  delta = DELTAsave;
     doublereal  cvR = cv_R();
-    //doublereal  nd = phi0_d();
     doublereal  rd = phiR_d();
     doublereal  rdd = phiR_dd();
     doublereal  rdt = phiR_dt();

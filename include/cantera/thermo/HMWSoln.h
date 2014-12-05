@@ -17,7 +17,7 @@
 #define CT_HMWSOLN_H
 
 #include "MolalityVPSSTP.h"
-#include "electrolytes.h"
+#include "cantera/base/Array.h"
 
 namespace Cantera
 {
@@ -79,7 +79,6 @@ namespace Cantera
 //@}
 
 class WaterProps;
-class PDSS_Water;
 
 /**
  * Class %HMWSoln represents a dilute or concentrated liquid electrolyte
@@ -1274,37 +1273,6 @@ public:
      */
     HMWSoln& operator=(const HMWSoln& right);
 
-    //! This is a special constructor, used to replicate test problems
-    //! during the initial verification of the object
-    /*!
-     *  test problems:
-     *  1 = NaCl problem - 5 species - the thermo is read in from an XML file
-     *
-     *      speci   molality                        charge
-     *      Cl-     6.0954          6.0997E+00      -1
-     *      H+      1.0000E-08      2.1628E-09      1
-     *      Na+     6.0954E+00      6.0997E+00      1
-     *      OH-     7.5982E-07      1.3977E-06     -1
-     *
-     *      HMW_params____beta0MX__beta1MX__beta2MX__CphiMX_____alphaMX__thetaij
-     *      10
-     *      1  2          0.1775  0.2945   0.0      0.00080    2.0      0.0
-     *      1  3          0.0765  0.2664   0.0      0.00127    2.0      0.0
-     *      1  4          0.0     0.0      0.0      0.0        0.0     -0.050
-     *      2  3          0.0     0.0      0.0      0.0        0.0      0.036
-     *      2  4          0.0     0.0      0.0      0.0        0.0      0.0
-     *      3  4          0.0864  0.253    0.0      0.0044     2.0      0.0
-     *
-     *      Triplet_interaction_parameters_psiaa'_or_psicc'
-     *      2
-     *      1  2  3   -0.004
-     *      1  3  4   -0.006
-     *
-     * @param testProb Hard -coded test problem to instantiate.
-     *                 Current valid values are 1.
-     */
-    HMWSoln(int testProb);
-
     //! Destructor.
     virtual ~HMWSoln();
 
@@ -1388,13 +1356,6 @@ public:
      * Note this is kmol of the guessed at salt composition
      */
     virtual doublereal relative_molal_enthalpy() const;
-
-    /// Molar internal energy. Units: J/kmol.
-    /**
-     * Molar internal energy of the solution. Units: J/kmol.
-     *      (HKM -> Bump up to Parent object)
-     */
-    virtual doublereal intEnergy_mole() const;
 
     /// Molar entropy. Units: J/kmol/K.
     /**
@@ -1552,29 +1513,6 @@ public:
     virtual void setState_TP(doublereal t, doublereal p);
 
     /**
-     * The isothermal compressibility. Units: 1/Pa.
-     * The isothermal compressibility is defined as
-     * \f[
-     * \kappa_T = -\frac{1}{v}\left(\frac{\partial v}{\partial P}\right)_T
-     * \f]
-     *  It's equal to zero for this model, since the molar volume
-     *  doesn't change with pressure or temperature.
-     */
-    virtual doublereal isothermalCompressibility() const;
-
-    /**
-     * The thermal expansion coefficient. Units: 1/K.
-     * The thermal expansion coefficient is defined as
-     *
-     * \f[
-     * \beta = \frac{1}{v}\left(\frac{\partial v}{\partial T}\right)_P
-     * \f]
-     *  It's equal to zero for this model, since the molar volume
-     *  doesn't change with pressure or temperature.
-     */
-    virtual doublereal thermalExpansionCoeff() const;
-
-    /**
      * @}
      * @name Potential Energy
      *
@@ -1705,13 +1643,6 @@ public:
      * @param k Species index
      */
     virtual doublereal standardConcentration(size_t k=0) const;
-
-    //! Returns the natural logarithm of the standard
-    //! concentration of the kth species
-    /*!
-     * @param k Species index
-     */
-    virtual doublereal logStandardConc(size_t k=0) const;
 
     //! Returns the units of the standard and generalized concentrations.
     /*!
@@ -1890,81 +1821,10 @@ public:
      */
     virtual void setToEquilState(const doublereal* lambda_RT) {
         updateStandardStateThermo();
-        err("setToEquilState");
+        throw NotImplementedError("HMWSoln::setToEquilState");
     }
 
     //@}
-
-    //! Set the equation of state parameters
-    /*!
-     * @internal
-     *  The number and meaning of these depends on the subclass.
-     *
-     * @param n number of parameters
-     * @param c array of \a n coefficients
-     */
-    virtual void setParameters(int n, doublereal* const c);
-
-    //! Get the equation of state parameters in a vector
-    /*!
-     * @internal
-     * The number and meaning of these depends on the subclass.
-     *
-     * @param n number of parameters
-     * @param c array of \a n coefficients
-     */
-    virtual void getParameters(int& n, doublereal* const c) const;
-
-    //! Set equation of state parameter values from XML
-    //! entries.
-    /*!
-     * This method is called by function importPhase in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
-     * any parameters that are specific to that particular phase
-     * model.
-     *
-     * HKM -> Right now, the parameters are set elsewhere (initThermoXML)
-     *        It just didn't seem to fit.
-     *
-     * @param eosdata An XML_Node object corresponding to
-     *                the "thermo" entry for this phase in the input file.
-     */
-    virtual void setParametersFromXML(const XML_Node& eosdata);
-
-    //---------------------------------------------------------
-    /// @name Critical state properties.
-    /// These methods are only implemented by some subclasses.
-    //@{
-
-    /// Critical temperature (K).
-    virtual doublereal critTemperature() const {
-        err("critTemperature");
-        return -1.0;
-    }
-
-    /// Critical pressure (Pa).
-    virtual doublereal critPressure() const {
-        err("critPressure");
-        return -1.0;
-    }
-
-    /// Critical density (kg/m3).
-    virtual doublereal critDensity() const {
-        err("critDensity");
-        return -1.0;
-    }
-
-    //@}
-
-    /// @name Saturation properties.
-    /// These methods are only implemented by subclasses that
-    /// implement full liquid-vapor equations of state.
-    ///
-    virtual doublereal satTemperature(doublereal p) const {
-        err("satTemperature");
-        return -1.0;
-    }
 
     //! Get the saturation pressure for a given temperature.
     /*!
@@ -1983,21 +1843,6 @@ public:
      */
     virtual doublereal satPressure(doublereal T);
 
-    virtual doublereal vaporFraction() const {
-        err("vaprFraction");
-        return -1.0;
-    }
-
-    virtual void setState_Tsat(doublereal t, doublereal x) {
-        err("setState_sat");
-    }
-
-    virtual void setState_Psat(doublereal p, doublereal x) {
-        err("setState_sat");
-    }
-
-    //@}
-
     /*
      *  -------------- Utilities -------------------------------
      */
@@ -2013,9 +1858,7 @@ public:
      * and subclasses that do not require initialization do not
      * need to overload this method.  When importing a CTML phase
      * description, this method is called just prior to returning
-     * from function importPhase.
-     *
-     * @see importCTML.cpp
+     * from function importPhase().
      */
     virtual void initThermo();
 
@@ -2402,9 +2245,6 @@ private:
      *                       = 1.0E3 at 25C
      */
     mutable double m_A_Debye;
-    mutable double m_last_dA_DebyedP_TP;
-    mutable double m_last_dA_DebyedP_TP_T;
-    mutable double m_last_dA_DebyedP_TP_P;
 
     //!  Water standard state calculator
     /*!
@@ -3151,12 +2991,6 @@ private:
     mutable std::vector<int> CROP_speciesCropped_;
     //! @}
 
-    //! Local error routine
-    /*!
-     * @param msg print out a message and error exit
-     */
-    doublereal err(const std::string& msg) const;
-
     //!  Initialize all of the species-dependent lengths in the object
     void initLengths();
 
@@ -3271,6 +3105,7 @@ private:
      * @param is Ionic strength
      */
     void calc_lambdas(double is) const;
+    mutable doublereal m_last_is;
 
     /**
      *  Calculate etheta and etheta_prime

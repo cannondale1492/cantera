@@ -13,7 +13,6 @@ Tmx = 2000.0,
 Tc = 154.581,
 Pc = 5.0429e6,
 Roc = 436.15,
-To = 54.34,
 R = 2.59820853437877e2,
 Gamma = 5.46895508389297e-6,
 alpha = 1.91576,
@@ -180,7 +179,6 @@ double oxygen::Pp()
 {
     double rt = 1.0/T;
     double rt2 = rt*rt;
-    //double rt3 = rt*rt2;
     double egrho = exp(-Gamma*Rho*Rho);
 
     double P = Rho*R*T;
@@ -241,14 +239,6 @@ double oxygen::Tmin()
 double oxygen::Tmax()
 {
     return Tmx;
-}
-char* oxygen::name()
-{
-    return (char*) m_name.c_str();
-}
-char* oxygen::formula()
-{
-    return (char*) m_formula.c_str();
 }
 double oxygen::MolWt()
 {

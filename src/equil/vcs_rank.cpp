@@ -10,14 +10,6 @@
  */
 
 #include "cantera/equil/vcs_solve.h"
-#include "cantera/equil/vcs_internal.h"
-#include "cantera/equil/vcs_prob.h"
-
-#include "cantera/equil/vcs_VolPhase.h"
-#include "cantera/equil/vcs_SpeciesProperties.h"
-#include "cantera/equil/vcs_species_thermo.h"
-
-#include "cantera/base/clockWC.h"
 #include "cantera/base/ctexceptions.h"
 
 #include <cstdio>
@@ -46,7 +38,7 @@ namespace VCSnonideal {
   int VCS_SOLVE::vcs_rank(const double * awtmp, size_t numSpecies,  const double matrix[], size_t numElemConstraints,
 			  std::vector<size_t> &compRes, std::vector<size_t>& elemComp, int * const usedZeroedSpecies) const 
   {
-
+    Cantera::warn_deprecated("VCS_SOLVE::vcs_rank", "To be removed after Cantera 2.2");
     int    lindep;
     size_t j, k, jl, i, l, ml;
     int numComponents = 0;
@@ -58,8 +50,7 @@ namespace VCSnonideal {
     vector<double> ss(numSpecies);
 
     double test = -0.2512345E298;
-#ifdef DEBUG_MODE
-    if (m_debug_print_lvl >= 2) {
+    if (DEBUG_MODE_ENABLED && m_debug_print_lvl >= 2) {
       plogf("   "); for(i=0; i<77; i++) plogf("-"); plogf("\n");
       plogf("   --- Subroutine vcs_rank called to ");
       plogf("calculate the rank and independent rows /colums of the following matrix\n");     
@@ -88,8 +79,6 @@ namespace VCSnonideal {
 	plogendl();
       }
     }
-#endif
-   
     /*
      *  Calculate the maximum value of the number of components possible
      *     It's equal to the minimum of the number of elements and the
@@ -181,7 +170,7 @@ namespace VCSnonideal {
 	 */
 	sa[jr] = 0.0;
 	for (ml = 0; ml < numElemConstraints; ++ml) {
-	  sa[jr] += SQUARE(sm[ml + jr * numElemConstraints]);
+	  sa[jr] += pow(sm[ml + jr * numElemConstraints], 2);
 	}
 	/* **************************************************** */
 	/* **** IF NORM OF NEW ROW  .LT. 1E-3 REJECT ********** */
@@ -256,7 +245,7 @@ namespace VCSnonideal {
 
 	sa[jr] = 0.0;
 	for (ml = 0; ml < numSpecies; ++ml) {
-	  sa[jr] += SQUARE(sm[ml + jr * numSpecies]);
+	  sa[jr] += pow(sm[ml + jr * numSpecies], 2);
 	}
 
 	if (sa[jr] < 1.0e-6)  lindep = true;
@@ -269,8 +258,7 @@ namespace VCSnonideal {
     numComponents = jr;
   LE_CLEANUP: ;
 
-#ifdef DEBUG_MODE
-    if (m_debug_print_lvl >= 2) {
+    if (DEBUG_MODE_ENABLED && m_debug_print_lvl >= 2) {
       plogf("   --- vcs_rank found rank %d\n", numComponents);
       if (m_debug_print_lvl >= 5) {
 	if (compRes.size() == elemComp.size()) {
@@ -288,7 +276,6 @@ namespace VCSnonideal {
 	} 
       }
     }
-#endif
 
     if (numComponentsR != numComponents) {
       printf("vcs_rank ERROR: number of components are different: %d %d\n", numComponentsR,  numComponents);

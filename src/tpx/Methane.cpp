@@ -14,7 +14,6 @@ Tmx = 1700.0,
 Tc = 190.555,
 Pc = 4.5988e6,
 Roc= 160.43,
-To = 90.68,
 Tt = 90.68,
 Pt=11743.5675,
 R = 5.18253475866e2,
@@ -234,14 +233,6 @@ double methane::Tmin()
 double methane::Tmax()
 {
     return Tmx;
-}
-char* methane::name()
-{
-    return (char*) m_name.c_str();
-}
-char* methane::formula()
-{
-    return (char*) m_formula.c_str();
 }
 double methane::MolWt()
 {

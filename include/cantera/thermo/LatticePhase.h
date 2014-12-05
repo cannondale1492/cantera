@@ -10,13 +10,8 @@
 #ifndef CT_LATTICE_H
 #define CT_LATTICE_H
 
-#include "cantera/base/config.h"
-
-#include "cantera/base/ct_defs.h"
 #include "mix_defs.h"
 #include "ThermoPhase.h"
-#include "SpeciesThermo.h"
-#include "cantera/base/utilities.h"
 
 namespace Cantera
 {
@@ -308,25 +303,6 @@ public:
      */
     virtual doublereal enthalpy_mole() const;
 
-    //! Molar internal energy of the solution. Units: J/kmol.
-    /*!
-     * For an ideal, constant partial molar volume solution mixture with
-     * pure species phases which exhibit zero volume expansivity and
-     * zero isothermal compressibility:
-     *
-     * \f[
-     * \hat u(T,X) = \hat h(T,P,X) - p \hat V
-     *         =  \sum_k X_k \hat h^0_k(T)  - P_{ref} (\sum_k{X_k \hat V^0_k})
-     * \f]
-     *
-     * and is a function only of temperature.
-     * The reference-state pure-species enthalpies
-     * \f$ \hat h^0_k(T) \f$ are computed by the species thermodynamic
-     * property manager.
-     * @see SpeciesThermo
-     */
-    virtual doublereal intEnergy_mole() const;
-
     //! Molar entropy of the solution. Units: J/kmol/K
     /*!
      * For an ideal, constant partial molar volume solution mixture with
@@ -344,22 +320,6 @@ public:
      * @see SpeciesThermo
      */
     virtual doublereal entropy_mole() const;
-
-    //! Molar gibbs free energy of the solution. Units: J/kmol.
-    /*!
-     * For an ideal, constant partial molar volume solution mixture with
-     * pure species phases which exhibit zero volume expansivity:
-     *  \f[
-     *    \hat g(T, P) = \sum_k X_k \hat g^0_k(T,P) + \hat R T \sum_k X_k log(X_k)
-     *  \f]
-     * The reference-state pure-species gibbs free energies
-     * \f$ \hat g^0_k(T) \f$ are computed by the species thermodynamic
-     * property manager, while the standard state gibbs free energies
-     * \f$ \hat g^0_k(T,P) \f$ are computed by the member function, gibbs_RT().
-     *
-     * @see SpeciesThermo
-     */
-    virtual doublereal gibbs_mole() const;
 
     //! Molar heat capacity at constant pressure of the solution.
     //! Units: J/kmol/K.
@@ -733,19 +693,6 @@ public:
     /// @name Thermodynamic Values for the Species Reference States
     //@{
 
-    //! Modify the value of the 298 K Heat of Formation of one species in the phase (J kmol-1)
-    /*!
-     *   The 298K heat of formation is defined as the enthalpy change to create the standard state
-     *   of the species from its constituent elements in their standard states at 298 K and 1 bar.
-     *
-     *   @param  k           Species k
-     *   @param  Hf298New    Specify the new value of the Heat of Formation at 298K and 1 bar
-     */
-    virtual void modifyOneHf298SS(const size_t& k, const doublereal Hf298New) {
-        m_spthermo->modifyOneHf298(k, Hf298New);
-        m_tlast += 0.0001234;
-    }
-
     //! Returns the vector of nondimensional
     //!  Enthalpies of the reference state at the current temperature
     //!  of the solution and the reference pressure for the phase.
@@ -811,8 +758,6 @@ public:
      * This method is called from ThermoPhase::initThermoXML(),
      * which is called from importPhase(),
      * just prior to returning from the function, importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
@@ -868,9 +813,8 @@ public:
 
     //! Set equation of state parameter values from XML entries.
     /*!
-     * This method is called by function importPhase() in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
+     * This method is called by function importPhase() when processing a phase
+     * definition in an input file. It should be overloaded in subclasses to set
      * any parameters that are specific to that particular phase
      * model. Note, this method is called before the phase is
      * initialized with elements and/or species.
@@ -907,9 +851,6 @@ protected:
      * m_dens, is always kept current whenever T, P, or X[] change.
      */
     doublereal m_Pcurrent;
-
-    //! Current value of the temperature (Kelvin)
-    mutable doublereal m_tlast;
 
     //! Reference state enthalpies / RT
     mutable vector_fp m_h0_RT;

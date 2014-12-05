@@ -19,11 +19,6 @@
 
 namespace Cantera
 {
-
-class SpeciesThermoInterpType;
-class VPStandardStateTP;
-class SpeciesThermo;
-class PDSS;
 class PDSS_Water;
 
 //! Manages standard state thermo properties for real water and a set of
@@ -110,8 +105,7 @@ public:
      * The following methods are used in the process of constructing
      * the phase and setting its parameters from a specification in an
      * input file. They are not normally used in application programs.
-     * To see how they are used, see files importCTML.cpp and
-     * ThermoFactory.cpp.
+     * To see how they are used, see importPhase().
      */
     //@{
     virtual void initThermo();

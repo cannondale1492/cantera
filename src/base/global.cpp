@@ -1,7 +1,5 @@
 //! @file global.cpp
-#include "cantera/base/global.h"
 
-#include "cantera/base/ctexceptions.h"
 #include "cantera/base/FactoryBase.h"
 #include "cantera/base/xml.h"
 #include "application.h"
@@ -68,8 +66,20 @@ void writelogendl()
     app()->writelogendl();
 }
 
+void writeline(char repeat, size_t count, bool endl_after, bool endl_before)
+{
+    if (endl_before) {
+        writelogendl();
+    }
+    writelog(std::string(count, repeat));
+    if (endl_after) {
+        writelogendl();
+    }
+}
+
 void error(const std::string& msg)
 {
+    warn_deprecated("error", "To be removed after Cantera 2.2");
     app()->logerror(msg);
 }
 
@@ -103,8 +113,12 @@ void thread_complete()
 XML_Node* get_XML_File(const std::string& file, int debug)
 {
     XML_Node* xtmp = app()->get_XML_File(file, debug) ;
-    //writelog("get_XML_File: returned from app:get_XML_FILE " + int2str(xtmp) + "\n");
     return xtmp;
+}
+
+XML_Node* get_XML_from_string(const std::string& text)
+{
+    return app()->get_XML_from_string(text);
 }
 
 void close_XML_File(const std::string& file)
@@ -215,6 +229,22 @@ XML_Node* get_XML_Node(const std::string& file_ID, XML_Node* root)
                                           "no file name given. file_ID = "+file_ID);
         db = root->findID(idstr, 3);
     } else {
+        try {
+            findInputFile(fname);
+        } catch (CanteraError& err) {
+            // See if the input file can be found with a different format
+            if (fname.rfind(".xml") == fname.size() - 4) {
+                fname.replace(fname.size() - 3, 3, "cti");
+            } else if (fname.rfind(".cti") == fname.size() - 4) {
+                fname.replace(fname.size() - 3, 3, "xml");
+            }
+            try {
+                findInputFile(fname);
+            } catch (CanteraError& err2) {
+                // rethrow the original error, which indicates the given file name
+                throw err;
+            }
+        }
         doc = get_XML_File(fname);
         if (!doc) throw CanteraError("get_XML_Node",
                                          "get_XML_File failed trying to open "+fname);

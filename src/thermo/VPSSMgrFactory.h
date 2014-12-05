@@ -13,7 +13,6 @@
 #ifndef VPSSSPECIESTHERMO_FACTORY_H
 #define VPSSSPECIESTHERMO_FACTORY_H
 
-#include "cantera/thermo/SpeciesThermo.h"
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/FactoryBase.h"
 #include "cantera/base/ct_thread.h"
@@ -21,10 +20,6 @@
 
 namespace Cantera
 {
-
-class XML_Node;
-class VPStandardStateTP;
-
 //! Throw a named error for an unknown or missing vpss species thermo model.
 /*!
  * @ingroup mgrpdssthermocalc

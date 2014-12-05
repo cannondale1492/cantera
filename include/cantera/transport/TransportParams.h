@@ -13,22 +13,6 @@
 namespace Cantera
 {
 
-class XML_Writer;
-
-//! Error class to indicate an unimplemented method
-/*!
- * This class is used by transport objects
- */
-class NotImplemented : public CanteraError
-{
-public:
-    //! Constructor for error class
-    /*!
-     *  @param method Single string indicating a method that is not implemented
-     */
-    NotImplemented(const std::string& method);
-};
-
 //! Base structure to hold transport model parameters.
 /*!
  * This structure is used by TransportFactory.
@@ -42,7 +26,7 @@ public:
     //! Local storage of the number of species
     size_t nsp_;
 
-    //!  Pointer to the ThermoPhase object
+    //!  Pointer to the ThermoPhase object: shallow pointer
     thermo_t* thermo;
 
     //! Local storage of the molecular weights of the species
@@ -65,9 +49,6 @@ public:
 
     //!  Mode parameter
     int mode_;
-
-    //! Pointer to the xml tree describing the implementation of transport for this object
-    XML_Writer* xml;
 
     //! Log level
     int log_level;
@@ -255,6 +236,14 @@ public:
      *  Length nsp * nsp .This is a symmetric matrix
      */
     DenseMatrix delta;
+    
+    //! Pitzer acentric factor
+    /*!
+     * Length is the number of species in the phase.
+     * Unitless
+     */
+    vector_fp w_ac;
+
 };
 
 } // End of namespace Cantera

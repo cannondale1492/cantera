@@ -11,8 +11,6 @@
 
 #include "mix_defs.h"
 #include "ThermoPhase.h"
-#include "SpeciesThermo.h"
-#include "cantera/base/utilities.h"
 
 namespace Cantera
 {
@@ -388,19 +386,6 @@ public:
     }
 
     /**
-     * Molar internal energy. J/kmol. For an ideal gas mixture,
-     * \f[
-     * \hat u(T) = \sum_k X_k \hat h^0_k(T) - \hat R T,
-     * \f]
-     * and is a function only of temperature.
-     * The reference-state pure-species enthalpies
-     * \f$ \hat h^0_k(T) \f$ are computed by the species thermodynamic
-     * property manager.
-     * @see SpeciesThermo
-     */
-    virtual doublereal intEnergy_mole() const;
-
-    /**
      * Molar entropy. Units: J/kmol/K.
      * For an ideal gas mixture,
      * \f[
@@ -412,12 +397,6 @@ public:
      * @see SpeciesThermo
      */
     virtual doublereal entropy_mole() const;
-
-    /**
-     * Molar Gibbs free Energy for an ideal gas.
-     * Units =  J/kmol.
-     */
-    virtual doublereal gibbs_mole() const;
 
     /**
      * Molar heat capacity at constant pressure. Units: J/kmol/K.
@@ -613,13 +592,6 @@ public:
      */
     virtual doublereal standardConcentration(size_t k = 0) const;
 
-    //! Returns the natural logarithm of the standard
-    //! concentration of the kth species
-    /*!
-     * @param k    index of the species. (defaults to zero)
-     */
-    virtual doublereal logStandardConc(size_t k = 0) const;
-
     //! Get the array of non-dimensional activity coefficients at
     //! the current solution temperature, pressure, and solution concentration.
     /*!
@@ -768,10 +740,6 @@ public:
      */
     virtual void getEnthalpy_RT_ref(doublereal* hrt) const;
 
-    virtual void modifyOneHf298SS(const size_t& k, const doublereal Hf298New) {
-        m_spthermo->modifyOneHf298(k, Hf298New);
-        m_tlast += 0.0001234;
-    }
     //!  Returns the vector of nondimensional
     //!  Gibbs Free Energies of the reference state at the current temperature
     //!  of the solution and the reference pressure for the species.
@@ -889,8 +857,6 @@ public:
      * This method is called from ThermoPhase::initThermoXML(),
      * which is called from importPhase(),
      * just prior to returning from the function, importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
@@ -919,9 +885,6 @@ protected:
      *  All species must have the same reference state pressure.
      */
     doublereal m_p0;
-
-    //! last value of the temperature processed by reference state
-    mutable doublereal m_tlast;
 
     //! Temporary storage for log of p/RT
     mutable doublereal m_logc0;

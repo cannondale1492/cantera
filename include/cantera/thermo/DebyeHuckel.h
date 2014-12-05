@@ -17,7 +17,6 @@
 #define CT_DEBYEHUCKEL_H
 
 #include "MolalityVPSSTP.h"
-#include "electrolytes.h"
 #include "cantera/base/Array.h"
 
 namespace Cantera
@@ -654,9 +653,6 @@ public:
     /// Molar enthalpy of the solution. Units: J/kmol.
     virtual doublereal enthalpy_mole() const;
 
-    /// Molar internal energy of the solution. Units: J/kmol.
-    virtual doublereal intEnergy_mole() const;
-
     /// Molar entropy. Units: J/kmol/K.
     /**
      * For an ideal, constant partial molar volume solution mixture with
@@ -796,31 +792,6 @@ public:
     virtual void setState_TP(doublereal t, doublereal p);
 
     /**
-     * The isothermal compressibility. Units: 1/Pa.
-     * The isothermal compressibility is defined as
-     * \f[
-     * \kappa_T = -\frac{1}{v}\left(\frac{\partial v}{\partial P}\right)_T
-     * \f]
-     *
-     *  It's equal to zero for this model, since the molar volume
-     *  doesn't change with pressure or temperature.
-     */
-    virtual doublereal isothermalCompressibility() const;
-
-    /**
-     * The thermal expansion coefficient. Units: 1/K.
-     * The thermal expansion coefficient is defined as
-     *
-     * \f[
-     * \beta = \frac{1}{v}\left(\frac{\partial v}{\partial T}\right)_P
-     * \f]
-     *
-     *  It's equal to zero for this model, since the molar volume
-     *  doesn't change with pressure or temperature.
-     */
-    virtual doublereal thermalExpansionCoeff() const;
-
-    /**
      * @}
      * @name Activities, Standard States,  and Activity Concentrations
      *
@@ -867,12 +838,6 @@ public:
      *   m<SUP>3</SUP> kmol<SUP>-1</SUP>.
      */
     virtual doublereal standardConcentration(size_t k=0) const;
-
-    //! Natural logarithm of the standard concentration of the kth species.
-    /*!
-     * @param k    index of the species (defaults to zero)
-     */
-    virtual doublereal logStandardConc(size_t k=0) const;
 
     //! Returns the units of the standard and generalized concentrations.
     /*!
@@ -941,7 +906,6 @@ public:
     //@}
     /// @name  Partial Molar Properties of the Solution
     //@{
-
 
     //! Get the species chemical potentials. Units: J/kmol.
     /*!
@@ -1041,7 +1005,6 @@ public:
 
     //@}
 
-protected:
     /**
      * @name Chemical Equilibrium
      * @{
@@ -1059,91 +1022,8 @@ protected:
      * @param lambda_RT Input vector of dimensionless element potentials
      *                  The length is equal to nElements().
      */
-public:
     virtual void setToEquilState(const doublereal* lambda_RT) {
-        err("setToEquilState");
-    }
-
-    //@}
-
-    //! Set the equation of state parameters
-    /*!
-     * @internal
-     *  The number and meaning of these depends on the subclass.
-     *
-     * @param n number of parameters
-     * @param c array of \a n coefficients
-     */
-    virtual void setParameters(int n, doublereal* const c);
-
-    //! Get the equation of state parameters in a vector
-    /*!
-     * @internal
-     * The number and meaning of these depends on the subclass.
-     *
-     * @param n number of parameters
-     * @param c array of \a n coefficients
-     */
-    virtual void getParameters(int& n, doublereal* const c) const;
-
-    //! Set equation of state parameter values from XML entries.
-    /*!
-     *
-     * This method is called by function importPhase() in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
-     * any parameters that are specific to that particular phase
-     * model. Note, this method is called before the phase is
-     * initialized with elements and/or species.
-     *
-     * HKM -> Right now, the parameters are set elsewhere (initThermoXML)
-     *        It just didn't seem to fit.
-     *
-     * @param eosdata An XML_Node object corresponding to
-     *                the "thermo" entry for this phase in the input file.
-     */
-    virtual void setParametersFromXML(const XML_Node& eosdata);
-
-    /// @name Saturation properties.
-    /// These methods are only implemented by subclasses that
-    /// implement full liquid-vapor equations of state.
-    ///
-    virtual doublereal satTemperature(doublereal p) const {
-        err("satTemperature");
-        return -1.0;
-    }
-
-    //! Get the saturation pressure for a given temperature.
-    /*!
-     * Note the limitations of this function. Stability considerations
-     * concerning multiphase equilibrium are ignored in this
-     * calculation. Therefore, the call is made directly to the SS of
-     * water underneath. The object is put back into its original
-     * state at the end of the call.
-     *
-     * @todo This is probably not implemented correctly. The stability
-     *       of the salt should be added into this calculation. The
-     *       underlying water model may be called to get the stability
-     *       of the pure water solution, if needed.
-     *
-     * @param T  Temperature (kelvin)
-     */
-    virtual doublereal satPressure(doublereal T) {
-        err("satPressure");
-        return -1.0;
-    }
-
-    virtual doublereal vaporFraction() const {
-        err("vaprFraction");
-        return -1.0;
-    }
-
-    virtual void setState_Tsat(doublereal t, doublereal x) {
-        err("setState_sat");
-    }
-
-    virtual void setState_Psat(doublereal p, doublereal x) {
-        err("setState_sat");
+        throw NotImplementedError("DebyeHuckel::setToEquilState");
     }
 
     //@}
@@ -1167,8 +1047,6 @@ public:
      * Cascading call sequence downwards starting with Parent.
      *
      * @internal
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
@@ -1331,8 +1209,6 @@ private:
     //@}
 
 protected:
-
-
     //! form of the Debye-Huckel parameterization  used in the model.
     /*!
      * The options are described at the top of this document,
@@ -1422,7 +1298,6 @@ protected:
     mutable double m_IionicMolalityStoich;
 
 public:
-
     /**
      * Form of the constant outside the Debye-Huckel term
      * called A. It's normally a function of temperature
@@ -1442,7 +1317,6 @@ public:
     int m_form_A_Debye;
 
 protected:
-
     //! Current value of the Debye Constant, A_Debye
     /**
      * A_Debye -> this expression appears on the top of the
@@ -1560,10 +1434,6 @@ protected:
     mutable vector_fp m_dlnActCoeffMolaldP;
 
 private:
-
-    //! Bail out of functions with an error exit if they are not implemented.
-    doublereal err(const std::string& msg) const;
-
     //! Initialize the internal lengths.
     /*!
      * This internal function adjusts the lengths of arrays based on
@@ -1571,7 +1441,6 @@ private:
      */
     void initLengths();
 
-private:
     //! Calculate the log activity coefficients
     /*!
      * This function updates the internally stored natural logarithm of the

@@ -9,21 +9,16 @@
 #define CT_TRANSPORTFACTORY_H
 
 // Cantera includes
-#include "cantera/base/ct_defs.h"
 #include "cantera/base/ct_thread.h"
 #include "TransportBase.h"
 #include "cantera/base/FactoryBase.h"
 #include "LiquidTransportParams.h"
-#include "SolidTransportData.h"
 
 namespace Cantera
 {
 
 // forward references
 class MMCollisionInt;
-class GasTransportParams;
-class LiquidTransportParams;
-class XML_Node;
 
 //! Factory class for creating new instances of classes derived from Transport.
 /*!
@@ -126,9 +121,6 @@ public:
      *  @param mode      Chemkin compatible mode or not. This alters the specification of the
      *                   collision integrals. defaults to no.
      *  @param log_level Defaults to zero, no logging
-     *
-     *  In DEBUG_MODE, this routine will create the file transport_log.xml
-     *  and write informative information to it.
      */
     virtual void initTransport(Transport* tr, thermo_t* thermo, int mode=0, int log_level=0);
 
@@ -141,9 +133,6 @@ public:
      * @param tr        Pointer to the Transport manager
      * @param thermo    Pointer to the ThermoPhase object
      * @param log_level Defaults to zero, no logging
-     *
-     * In DEBUG_MODE, this routine will create the file transport_log.xml
-     * and write informative information to it.
      */
     virtual void initLiquidTransport(Transport* tr, thermo_t* thermo, int log_level=0);
 
@@ -157,9 +146,6 @@ private:
      * @param tr        Pointer to the Transport manager
      * @param thermo    Pointer to the ThermoPhase object
      * @param log_level Defaults to zero, no logging
-     *
-     * In DEBUG_MODE, this routine will create the file transport_log.xml
-     * and write informative information to it.
      */
     virtual void initSolidTransport(Transport* tr, thermo_t* thermo, int log_level=0);
 
@@ -188,6 +174,7 @@ private:
      * instance of TransportParams containing the transport data for
      * these species read from the file.
      *
+     *  @param thermo      The phase with species corresponding to the transport data
      *  @param xspecies    Vector of pointers to species XML_Node databases.
      *  @param log         reference to an XML_Node that will contain the log (unused)
      *  @param names       vector of species names that must be filled in with valid transport parameters
@@ -195,7 +182,7 @@ private:
      *                     for the species listed in names (in the order of their listing
      *                     in names).
      */
-    void getTransportData(const std::vector<const XML_Node*> &xspecies,
+    void getTransportData(const ThermoPhase& thermo, const std::vector<const XML_Node*> &xspecies,
                           XML_Node& log, const std::vector<std::string>& names,
                           GasTransportParams& tr);
 
@@ -274,21 +261,16 @@ private:
      *     \f]
      *
      *  @param tr       Reference to the GasTransportParams object that will contain the results.
-     *  @param logfile  Reference to an ostream that will contain log information when in
-     *                  DEBUG_MODE
      *  @param integrals interpolator for the collision integrals
      */
-    void fitProperties(GasTransportParams& tr, MMCollisionInt& integrals,
-                       std::ostream& logfile);
+    void fitProperties(GasTransportParams& tr, MMCollisionInt& integrals);
 
     //! Generate polynomial fits to collision integrals
     /*!
-     *     @param logfile  Reference to an ostream that will contain log information when in
-     *                     DEBUG_MODE
      *     @param tr       Reference to the GasTransportParams object that will contain the results.
      *     @param integrals interpolator for the collision integrals
      */
-    void fitCollisionIntegrals(std::ostream& logfile, GasTransportParams& tr,
+    void fitCollisionIntegrals(GasTransportParams& tr,
                                MMCollisionInt& integrals);
 
     //! Prepare to build a new kinetic-theory-based transport manager for low-density gases
@@ -297,7 +279,6 @@ private:
      *
      *  Uses polynomial fits to Monchick & Mason collision integrals. store then in tr
      *
-     *  @param flog                 Reference to the ostream for writing log info
      *  @param transport_database   Reference to a vector of pointers containing the
      *                              transport database for each species
      *  @param thermo               Pointer to the %ThermoPhase object
@@ -306,27 +287,25 @@ private:
      *  @param log_level            log level
      *  @param tr                   GasTransportParams structure to be filled up with information
      */
-    void setupMM(std::ostream& flog,  const std::vector<const XML_Node*> &transport_database,
+    void setupMM(const std::vector<const XML_Node*> &transport_database,
                  thermo_t* thermo, int mode, int log_level,  GasTransportParams& tr);
 
     //! Prepare to build a new transport manager for liquids assuming that
     //! viscosity transport data is provided in Arrhenius form.
     /*!
-     *  @param flog                 Reference to the ostream for writing log info
      *  @param thermo               Pointer to the %ThermoPhase object
      *  @param log_level            log level
      *  @param trParam              LiquidTransportParams structure to be filled up with information
      */
-    void setupLiquidTransport(std::ostream& flog, thermo_t* thermo, int log_level, LiquidTransportParams& trParam);
+    void setupLiquidTransport(thermo_t* thermo, int log_level, LiquidTransportParams& trParam);
 
     //! Prepare to build a new transport manager for solids
     /*!
-     *  @param flog                 Reference to the ostream for writing log info
      *  @param thermo               Pointer to the %ThermoPhase object
      *  @param log_level            log level
      *  @param trParam              SolidTransportData structure to be filled up with information
      */
-    void setupSolidTransport(std::ostream& flog, thermo_t* thermo, int log_level, SolidTransportData& trParam);
+    void setupSolidTransport(thermo_t* thermo, int log_level, SolidTransportData& trParam);
 
     //! Second-order correction to the binary diffusion coefficients
     /*!

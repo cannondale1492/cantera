@@ -8,20 +8,9 @@
  * U.S. Government retains certain rights in this software.
  */
 #include "cantera/equil/vcs_MultiPhaseEquil.h"
-#include "cantera/equil/vcs_prob.h"
-#include "cantera/equil/vcs_internal.h"
-#include "cantera/equil/vcs_VolPhase.h"
-#include "cantera/equil/vcs_species_thermo.h"
-#include "cantera/equil/vcs_SpeciesProperties.h"
-#include "cantera/equil/vcs_VolPhase.h"
-#include "cantera/equil/vcs_solve.h"
 #include "cantera/equil/equil.h"
 
 #include "cantera/base/stringUtils.h"
-#include "cantera/thermo/mix_defs.h"
-#include "cantera/thermo/speciesThermoTypes.h"
-#include "cantera/thermo/IdealSolidSolnPhase.h"
-#include "cantera/thermo/IdealMolalSoln.h"
 #include "cantera/equil/ChemEquil.h"
 
 using namespace std;
@@ -34,9 +23,10 @@ int vcs_equilibrate(thermo_t& s, const char* XY,
                     doublereal rtol, int maxsteps, int maxiter,
                     int loglevel)
 {
+    warn_deprecated("vcs_equilibrate", "Use ThermoPhase::equilibrate instead. "
+        "To be removed after Cantera 2.2.");
     MultiPhase* m = 0;
     int retn = 1;
-    int retnSub = 0;
 
     if (solver == 2) {
         m = new MultiPhase;
@@ -78,7 +68,7 @@ int vcs_equilibrate(thermo_t& s, const char* XY,
             if (estimateEquil == 0) {
                 useThermoPhaseElementPotentials = true;
             }
-            retnSub = e->equilibrate(s, XY,
+            int retnSub = e->equilibrate(s, XY,
                                      useThermoPhaseElementPotentials, loglevel-1);
             if (retnSub < 0) {
                 delete e;
@@ -119,6 +109,8 @@ int vcs_equilibrate_1(MultiPhase& s, int ixy,
                       int estimateEquil, int printLvl, int solver,
                       doublereal tol, int maxsteps, int maxiter, int loglevel)
 {
+    warn_deprecated("vcs_equilibrate_1", "Use MultiPhase::equilibrate instead. "
+        "To be removed after Cantera 2.2.");
     static int counter = 0;
     int retn = 1;
 
@@ -159,7 +151,6 @@ int vcs_equilibrate_1(MultiPhase& s, int ixy,
             }
         } else {
             throw CanteraError("equilibrate","unsupported option");
-            //return -1.0;
         }
     } else {
         throw CanteraError("vcs_equilibrate_1", "unknown solver");

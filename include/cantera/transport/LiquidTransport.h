@@ -7,15 +7,10 @@
 
 #include "TransportBase.h"
 #include "cantera/numerics/DenseMatrix.h"
-#include "TransportParams.h"
 #include "LiquidTransportParams.h"
 
 namespace Cantera
 {
-
-// Forward references
-class LiquidTransportParams;
-
 //! Class LiquidTransport implements models for transport
 //! properties for liquid phases.
 /*!
@@ -1312,14 +1307,6 @@ private:
      *  Turn on to get debugging information
      */
     bool m_debug;
-
-    //! Throw an exception if this method is invoked.
-    /*!
-     * This probably indicates something is not yet implemented.
-     *
-     * @param msg      Indicates the member function which is not implemented
-     */
-    doublereal err(const std::string& msg) const;
 };
 }
 #endif

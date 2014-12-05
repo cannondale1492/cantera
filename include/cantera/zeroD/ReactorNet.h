@@ -36,7 +36,7 @@ public:
      */
     void setInitialTime(doublereal time) {
         m_time = time;
-        m_init = false;
+        m_integrator_init = false;
     }
 
     //! Set the maximum time step.
@@ -114,13 +114,20 @@ public:
     //@}
 
     //! Add the reactor *r* to this reactor network.
-    void addReactor(ReactorBase* r, bool iown = false);
+    void addReactor(Reactor& r);
+
+    //! Add the reactor *r* to this reactor network.
+    /**
+     *  @deprecated To be removed after Cantera 2.2. Use addReactor(Reactor&)
+     *  instead.
+     */
+    void addReactor(Reactor* r, bool iown = false);
 
     //! Return a reference to the *n*-th reactor in this network. The reactor
     //! indices are determined by the order in which the reactors were added
     //! to the reactor network.
-    ReactorBase& reactor(int n) {
-        return *m_r[n];
+    Reactor& reactor(int n) {
+        return *m_reactors[n];
     }
 
     //! Returns `true` if verbose logging output is enabled.
@@ -198,13 +205,16 @@ public:
         return m_paramNames.at(p);
     }
 
-    void connect(size_t i, size_t j) {
-        m_connect[j*m_nr + i] = 1;
-        m_connect[i*m_nr + j] = 1;
-    }
+    //! Reinitialize the integrator. Used to solve a new problem (different
+    //! initial conditions) but with the same configuration of the reactor
+    //! network. Can be called manually, or automatically after calling
+    //! setInitialTime or modifying a reactor's contents.
+    void reinitialize();
 
-    bool connected(size_t i, size_t j) {
-        return (m_connect[m_nr*i + j] == 1);
+    //! Called to trigger integrator reinitialization before further
+    //! integration.
+    void setNeedsReinit() {
+        m_integrator_init = false;
     }
 
 protected:
@@ -214,15 +224,16 @@ protected:
      */
     void initialize();
 
-    std::vector<ReactorBase*> m_r;
     std::vector<Reactor*> m_reactors;
-    size_t m_nr;
-    size_t m_nreactors;
     Integrator* m_integ;
     doublereal m_time;
     bool m_init;
+    bool m_integrator_init; //! True if integrator initialization is current
     size_t m_nv;
-    std::vector<size_t> m_size;
+
+    //! m_start[n] is the starting point in the state vector for reactor n
+    std::vector<size_t> m_start;
+
     vector_fp m_atol;
     doublereal m_rtol, m_rtolsens;
     doublereal m_atols, m_atolsens;
@@ -244,7 +255,6 @@ protected:
     //! output.
     std::vector<size_t> m_sensIndex;
 
-    vector_int m_connect;
     vector_fp m_ydot;
 
     std::vector<bool> m_iown;

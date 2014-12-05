@@ -6,15 +6,14 @@
  */
 // Copyright 2001  California Institute of Technology
 
-#include "cantera/base/config.h"
+#include "cantera/base/xml.h"
+#include "cantera/base/stringUtils.h"
+#include "cantera/base/global.h"
+#include "cantera/base/utilities.h"
+
 #include <sstream>
 
-#include <algorithm>
 using namespace std;
-
-#include "cantera/base/xml.h"
-#include "cantera/base/global.h"
-#include "cantera/base/stringUtils.h"
 
 namespace Cantera
 {
@@ -416,18 +415,18 @@ XML_Node& XML_Node::addChild(const std::string& sname)
     return mergeAsChild(*(new XML_Node(sname, this)));
 }
 
-XML_Node& XML_Node::addChild(const std::string& name_, const std::string& value_)
+XML_Node& XML_Node::addChild(const std::string& name, const std::string& value)
 {
-    XML_Node& c = addChild(name_);
-    c.addValue(value_);
+    XML_Node& c = addChild(name);
+    c.addValue(value);
     return c;
 }
 
-XML_Node& XML_Node::addChild(const std::string& name_, const doublereal value_,
+XML_Node& XML_Node::addChild(const std::string& name, const doublereal value,
                              const std::string& fmt)
 {
-    XML_Node& c = addChild(name_);
-    c.addValue(value_, fmt);
+    XML_Node& c = addChild(name);
+    c.addValue(value, fmt);
     return c;
 }
 
@@ -467,6 +466,8 @@ std::string XML_Node::value() const
 
 std::string XML_Node::operator()() const
 {
+    warn_deprecated("XML_Node::operator()",
+                    "To be removed after Cantera 2.2. Use XML_Node::value().");
     return m_value;
 }
 
@@ -490,15 +491,25 @@ std::string XML_Node::operator()(const std::string& loc) const
     return value(loc);
 }
 
-void XML_Node::addAttribute(const std::string& attrib_, const std::string& value_)
+void XML_Node::addAttribute(const std::string& attrib, const std::string& value)
 {
-    m_attribs[attrib_] = value_;
+    m_attribs[attrib] = value;
 }
 
-void XML_Node::addAttribute(const std::string& attrib_,
-                            const doublereal value_, const std::string& fmt)
+void XML_Node::addAttribute(const std::string& attrib,
+                            const doublereal vvalue, const std::string& fmt)
 {
-    m_attribs[attrib_] = fp2str(value_, fmt);
+    m_attribs[attrib] = fp2str(vvalue, fmt);
+}
+
+void XML_Node::addAttribute(const std::string& aattrib, const int vvalue)
+{
+    m_attribs[aattrib] = int2str(vvalue);
+}
+
+void XML_Node::addAttribute(const std::string& aattrib, const size_t vvalue)
+{
+    m_attribs[aattrib] = int2str(vvalue);
 }
 
 std::string XML_Node::operator[](const std::string& attr) const
@@ -508,11 +519,7 @@ std::string XML_Node::operator[](const std::string& attr) const
 
 std::string XML_Node::attrib(const std::string& attr) const
 {
-    std::map<std::string,std::string>::const_iterator i = m_attribs.find(attr);
-    if (i != m_attribs.end()) {
-        return i->second;
-    }
-    return "";
+    return getValue<string,string>(m_attribs, attr, "");
 }
 
 std::map<std::string,std::string>& XML_Node::attribs()
@@ -598,9 +605,8 @@ void XML_Node::_require(const std::string& a, const std::string& v) const
     throw CanteraError("XML_Node::require", msg);
 }
 
-XML_Node* XML_Node::
-findNameID(const std::string& nameTarget,
-           const std::string& idTarget) const
+XML_Node* XML_Node::findNameID(const std::string& nameTarget,
+                               const std::string& idTarget) const
 {
     XML_Node* scResult = 0;
     XML_Node* sc;
@@ -891,11 +897,24 @@ void XML_Node::unlock()
 void XML_Node::getChildren(const std::string& nm,
                            std::vector<XML_Node*>& children_) const
 {
+    warn_deprecated("XML_Node::getChildren", "To be removed after Cantera 2.2."
+                    "Use overload that returns the vector of XML_Node pointers.");
     for (size_t i = 0; i < nChildren(); i++) {
         if (child(i).name() == nm) {
             children_.push_back(&child(i));
         }
     }
+}
+
+std::vector<XML_Node*> XML_Node::getChildren(const std::string& nm) const
+{
+    std::vector<XML_Node*> children_;
+    for (size_t i = 0; i < nChildren(); i++) {
+        if (child(i).name() == nm) {
+            children_.push_back(&child(i));
+        }
+    }
+    return children_;
 }
 
 XML_Node& XML_Node::child(const std::string& aloc) const
@@ -1092,9 +1111,7 @@ XML_Node* findXMLPhase(XML_Node* root,
         idattrib = root->id();
         if (idtarget == idattrib) {
             return root;
-        } else {
-            return               0;
-        }
+        } 
     }
 
     const vector<XML_Node*> &vsc = root->children();
@@ -1112,11 +1129,9 @@ XML_Node* findXMLPhase(XML_Node* root,
     }
     for (size_t n = 0; n < root->nChildren(); n++) {
         sc = vsc[n];
-        if (sc->name() != "phase") {
-            scResult = findXMLPhase(sc, idtarget);
-            if (scResult) {
-                return scResult;
-            }
+        scResult = findXMLPhase(sc, idtarget);
+        if (scResult) {
+            return scResult;
         }
     }
     return scResult;

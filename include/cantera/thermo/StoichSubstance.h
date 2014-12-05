@@ -11,7 +11,6 @@
 
 #include "mix_defs.h"
 #include "ThermoPhase.h"
-#include "SpeciesThermo.h"
 
 namespace Cantera
 {
@@ -96,12 +95,6 @@ public:
      * the temperature.
      */
     virtual doublereal entropy_mole() const;
-
-    /**
-     * Molar gibbs Function. Units: J/kmol. This is determined
-     * from the molar enthalpy and entropy functions.
-     */
-    virtual doublereal gibbs_mole() const;
 
     /**
      * Molar heat capacity at constant pressure. Units: J/kmol/K.
@@ -230,6 +223,21 @@ public:
      */
     virtual void getPartialMolarEntropies(doublereal* sbar) const;
 
+    //! Get the species partial molar enthalpies. Units: J/kmol.
+    /*!
+     * @param ubar    Output vector of species partial molar internal energies.
+     *                Length = m_kk. units are J/kmol.
+     */
+    virtual void getPartialMolarIntEnergies(doublereal* ubar) const;
+
+    //! Get the partial molar heat capacities Units: J/kmol/K
+    /*!
+     * @param cpbar   Output vector of species partial molar heat capacities
+     *                at constant pressure.
+     *                Length = m_kk. units are J/kmol/K.
+     */
+    virtual void getPartialMolarCp(doublereal* cpbar) const;
+
     /**
      * returns an array of partial molar volumes of the species
      * in the solution. Units: m^3 kmol-1.
@@ -297,11 +305,6 @@ public:
      */
     virtual void getEnthalpy_RT_ref(doublereal* hrt) const;
 
-    virtual void modifyOneHf298SS(const size_t& k, const doublereal Hf298New) {
-        m_spthermo->modifyOneHf298(k, Hf298New);
-        m_tlast += 0.0001234;
-    }
-
     /**
      *  Returns the vector of nondimensional
      *  enthalpies of the reference state at the current temperature
@@ -362,7 +365,6 @@ protected:
     doublereal m_press;
     doublereal m_p0;
 
-    mutable doublereal     m_tlast;
     mutable vector_fp      m_h0_RT;
     mutable vector_fp      m_cp0_R;
     mutable vector_fp      m_s0_R;

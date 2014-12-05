@@ -7,7 +7,6 @@
 #ifndef CT_WALL_H
 #define CT_WALL_H
 
-#include "cantera/base/ct_defs.h"
 #include "cantera/base/ctexceptions.h"
 #include "cantera/numerics/Func1.h"
 
@@ -17,7 +16,6 @@ namespace Cantera
 // forward references
 class ReactorBase;
 class Kinetics;
-class Func1;
 class SurfPhase;
 
 //! Represents a wall between between two ReactorBase objects.

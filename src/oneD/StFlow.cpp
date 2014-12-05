@@ -3,12 +3,10 @@
  */
 // Copyright 2002  California Institute of Technology
 
-#include <stdlib.h>
-#include <time.h>
-
 #include "cantera/oneD/StFlow.h"
 #include "cantera/base/ctml.h"
-#include "cantera/oneD/MultiJac.h"
+#include "cantera/transport/TransportBase.h"
+#include "cantera/numerics/funcs.h"
 
 #include <cstdio>
 
@@ -17,12 +15,6 @@ using namespace std;
 
 namespace Cantera
 {
-
-static void st_drawline()
-{
-    writelog("\n-------------------------------------"
-             "------------------------------------------");
-}
 
 StFlow::StFlow(IdealGasPhase* ph, size_t nsp, size_t points) :
     Domain1D(nsp+4, points),
@@ -143,6 +135,10 @@ void StFlow::setupGrid(size_t n, const doublereal* z)
 
     m_z[0] = z[0];
     for (j = 1; j < m_points; j++) {
+        if (z[j] <= z[j-1]) {
+            throw CanteraError("StFlow::setupGrid",
+                               "grid points must be monotonically increasing");
+        }
         m_z[j] = z[j];
         m_dz[j-1] = m_z[j] - m_z[j-1];
     }
@@ -153,12 +149,13 @@ void StFlow::setTransport(Transport& trans, bool withSoret)
     m_trans = &trans;
     m_do_soret = withSoret;
 
-    if (m_trans->model() == cMulticomponent) {
+    int model = m_trans->model();
+    if (model == cMulticomponent || model == CK_Multicomponent) {
         m_transport_option = c_Multi_Transport;
         m_multidiff.resize(m_nsp*m_nsp*m_points);
         m_diff.resize(m_nsp*m_points);
         m_dthermal.resize(m_nsp, m_points, 0.0);
-    } else if (m_trans->model() == cMixtureAveraged) {
+    } else if (model == cMixtureAveraged || model == CK_MixtureAveraged) {
         m_transport_option = c_Mixav_Transport;
         m_diff.resize(m_nsp*m_points);
         if (withSoret)
@@ -209,11 +206,11 @@ void StFlow::_finalize(const doublereal* x)
     bool e = m_do_energy[0];
     for (j = 0; j < m_points; j++) {
         if (e || nz == 0) {
-            setTemperature(j, T(x, j));
+            m_fixedtemp[j] = T(x, j);
         } else {
             zz = (z(j) - z(0))/(z(m_points - 1) - z(0));
             tt = linearInterp(zz, m_zfix, m_tfix);
-            setTemperature(j, tt);
+            m_fixedtemp[j] = tt;
         }
         for (k = 0; k < m_nsp; k++) {
             setMassFraction(j, k, Y(x, k, j));
@@ -265,10 +262,9 @@ void StFlow::eval(size_t jg, doublereal* xg,
     //              update properties
     //-----------------------------------------------------
 
-    // update thermodynamic and transport properties only if a Jacobian is not
-    // being evaluated
+    updateThermo(x, j0, j1);
+    // update transport properties only if a Jacobian is not being evaluated
     if (jg == npos) {
-        updateThermo(x, j0, j1);
         updateTransport(x, j0, j1);
     }
 
@@ -363,8 +359,6 @@ void StFlow::eval(size_t jg, doublereal* xg,
     }
     
     for (j = jmin; j <= jmax; j++) {
-
-
         //----------------------------------------------
         //         left boundary
         //----------------------------------------------
@@ -400,7 +394,6 @@ void StFlow::eval(size_t jg, doublereal* xg,
             }
             rsd[index(c_offset_Y, 0)] = 1.0 - sum;
         }
-
 
         else if (j == m_points - 1) {
             evalRightBoundary(x, rsd, diag, rdt);
@@ -503,34 +496,21 @@ void StFlow::updateTransport(doublereal* x, size_t j0, size_t j1)
             m_tcon[j] = m_trans->thermalConductivity();
         }
     } else if (m_transport_option == c_Multi_Transport) {
-        doublereal sum, sumx, wtm, dz;
-        doublereal eps = 1.0e-12;
-        for (size_t m = j0; m < j1; m++) {
-            setGasAtMidpoint(x,m);
-            dz = m_z[m+1] - m_z[m];
-            wtm = m_thermo->meanMolecularWeight();
+        for (size_t j = j0; j < j1; j++) {
+            setGasAtMidpoint(x,j);
+            doublereal wtm = m_thermo->meanMolecularWeight();
+            doublereal rho = m_thermo->density();
+            m_visc[j] = (m_dovisc ? m_trans->viscosity() : 0.0);
+            m_trans->getMultiDiffCoeffs(m_nsp, &m_multidiff[mindex(0,0,j)]);
 
-            m_visc[m] = (m_dovisc ? m_trans->viscosity() : 0.0);
-
-            m_trans->getMultiDiffCoeffs(m_nsp,
-                                        DATA_PTR(m_multidiff) + mindex(0,0,m));
-
+            // Use m_diff as storage for the factor outside the summation
             for (size_t k = 0; k < m_nsp; k++) {
-                sum = 0.0;
-                sumx = 0.0;
-                for (size_t j = 0; j < m_nsp; j++) {
-                    if (j != k) {
-                        sum += m_wt[j]*m_multidiff[mindex(k,j,m)]*
-                               ((X(x,j,m+1) - X(x,j,m))/dz + eps);
-                        sumx += (X(x,j,m+1) - X(x,j,m))/dz;
-                    }
-                }
-                m_diff[k + m*m_nsp] = sum/(wtm*(sumx+eps));
+                m_diff[k+j*m_nsp] = m_wt[k] * rho / (wtm*wtm);
             }
 
-            m_tcon[m] = m_trans->thermalConductivity();
+            m_tcon[j] = m_trans->thermalConductivity();
             if (m_do_soret) {
-                m_trans->getThermalDiffCoeffs(m_dthermal.ptrColumn(0) + m*m_nsp);
+                m_trans->getThermalDiffCoeffs(m_dthermal.ptrColumn(0) + j*m_nsp);
             }
         }
     }
@@ -540,7 +520,6 @@ void StFlow::showSolution(const doublereal* x)
 {
     size_t nn = m_nv/5;
     size_t i, j, n;
-    //char* buf = new char[100];
     char buf[100];
 
     // The mean molecular weight is needed to convert
@@ -549,14 +528,14 @@ void StFlow::showSolution(const doublereal* x)
     sprintf(buf, "    Pressure:  %10.4g Pa \n", m_press);
     writelog(buf);
     for (i = 0; i < nn; i++) {
-        st_drawline();
+        writeline('-', 79, false, true);
         sprintf(buf, "\n        z   ");
         writelog(buf);
         for (n = 0; n < 5; n++) {
             sprintf(buf, " %10s ",componentName(i*5 + n).c_str());
             writelog(buf);
         }
-        st_drawline();
+        writeline('-', 79, false, true);
         for (j = 0; j < m_points; j++) {
             sprintf(buf, "\n %10.4g ",m_z[j]);
             writelog(buf);
@@ -568,14 +547,14 @@ void StFlow::showSolution(const doublereal* x)
         writelog("\n");
     }
     size_t nrem = m_nv - 5*nn;
-    st_drawline();
+    writeline('-', 79, false, true);
     sprintf(buf, "\n        z   ");
     writelog(buf);
     for (n = 0; n < nrem; n++) {
         sprintf(buf, " %10s ", componentName(nn*5 + n).c_str());
         writelog(buf);
     }
-    st_drawline();
+    writeline('-', 79, false, true);
     for (j = 0; j < m_points; j++) {
         sprintf(buf, "\n %10.4g ",m_z[j]);
         writelog(buf);
@@ -606,7 +585,6 @@ void StFlow::updateDiffFluxes(const doublereal* x, size_t j0, size_t j1)
     switch (m_transport_option) {
 
     case c_Mixav_Transport:
-    case c_Multi_Transport:
         for (j = j0; j < j1; j++) {
             sum = 0.0;
             wtm = m_wtm[j];
@@ -621,6 +599,20 @@ void StFlow::updateDiffFluxes(const doublereal* x, size_t j0, size_t j1)
             // correction flux to insure that \sum_k Y_k V_k = 0.
             for (k = 0; k < m_nsp; k++) {
                 m_flux(k,j) += sum*Y(x,k,j);
+            }
+        }
+        break;
+
+    case c_Multi_Transport:
+        for (j = j0; j < j1; j++) {
+            dz = z(j+1) - z(j);
+
+            for (k = 0; k < m_nsp; k++) {
+                doublereal sum = 0.0;
+                for (size_t m = 0; m < m_nsp; m++) {
+                    sum += m_wt[m] * m_multidiff[mindex(k,m,j)] * (X(x,m,j+1)-X(x,m,j));
+                }
+                m_flux(k,j) = sum * m_diff[k+j*m_nsp] / dz;
             }
         }
         break;
@@ -688,20 +680,17 @@ void StFlow::restore(const XML_Node& dom, doublereal* soln, int loglevel)
     size_t nsp = m_thermo->nSpecies();
     vector_int did_species(nsp, 0);
 
-    vector<XML_Node*> str;
-    dom.getChildren("string",str);
+    vector<XML_Node*> str = dom.getChildren("string");
     for (size_t istr = 0; istr < str.size(); istr++) {
         const XML_Node& nd = *str[istr];
         writelog(nd["title"]+": "+nd.value()+"\n");
     }
 
-    //map<string, double> params;
     double pp = -1.0;
     pp = getFloat(dom, "pressure", "pressure");
     setPressure(pp);
 
-    vector<XML_Node*> d;
-    dom.child("grid_data").getChildren("floatArray",d);
+    vector<XML_Node*> d = dom.child("grid_data").getChildren("floatArray");
     size_t nd = d.size();
 
     vector_fp x;
@@ -1053,7 +1042,6 @@ void FreeFlame::_finalize(const doublereal* x)
         }
     }
 }
-
 
 void FreeFlame::restore(const XML_Node& dom, doublereal* soln, int loglevel)
 {

@@ -3,8 +3,6 @@
  */
 
 // Copyright 2001  California Institute of Technology
-#include "cantera/base/config.h"
-
 #include "cantera/numerics/CVodesIntegrator.h"
 #include "cantera/base/stringUtils.h"
 
@@ -30,7 +28,6 @@ using namespace std;
 #define CV_SV 2
 
 #include <sstream>
-#include <algorithm>
 
 namespace Cantera
 {
@@ -46,8 +43,6 @@ public:
     vector_fp m_pars;
     FuncEval* m_func;
 };
-}
-
 
 extern "C" {
 
@@ -82,10 +77,19 @@ extern "C" {
         }
         return 0; // successful evaluation
     }
+
+    //! Function called by CVodes when an error is encountered instead of
+    //! writing to stdout. Here, save the error message provided by CVodes so
+    //! that it can be included in the subsequently raised CanteraError.
+    static void cvodes_err(int error_code, const char* module,
+                           const char* function, char* msg, void* eh_data)
+    {
+        CVodesIntegrator* integrator = (CVodesIntegrator*) eh_data;
+        integrator->m_error_message = msg;
+        integrator->m_error_message += "\n";
+    }
 }
 
-namespace Cantera
-{
 CVodesIntegrator::CVodesIntegrator() :
     m_neq(0),
     m_cvode_mem(0),
@@ -111,9 +115,6 @@ CVodesIntegrator::CVodesIntegrator() :
     m_mupper(0), m_mlower(0),
     m_sens_ok(false)
 {
-    //m_ropt.resize(OPT_SIZE,0.0);
-    //m_iopt = new long[OPT_SIZE];
-    //fill(m_iopt, m_iopt+OPT_SIZE,0);
 }
 
 CVodesIntegrator::~CVodesIntegrator()
@@ -131,8 +132,6 @@ CVodesIntegrator::~CVodesIntegrator()
         N_VDestroy_Serial(m_abstol);
     }
     delete m_fdata;
-
-    //delete[] m_iopt;
 }
 
 double& CVodesIntegrator::solution(size_t k)
@@ -307,6 +306,7 @@ void CVodesIntegrator::initialize(double t0, FuncEval& func)
             throw CVodesErr("CVodeInit failed.");
         }
     }
+    CVodeSetErrHandlerFn(m_cvode_mem, &cvodes_err, this);
 
     if (m_itol == CV_SV) {
         flag = CVodeSVtolerances(m_cvode_mem, m_reltol, m_abstol);
@@ -327,7 +327,6 @@ void CVodesIntegrator::initialize(double t0, FuncEval& func)
     delete m_fdata;
     m_fdata = new FuncData(&func, func.nparams());
 
-    //m_data = (void*)&func;
     flag = CVodeSetUserData(m_cvode_mem, (void*)m_fdata);
     if (flag != CV_SUCCESS) {
         throw CVodesErr("CVodeSetUserData failed.");
@@ -345,13 +344,7 @@ void CVodesIntegrator::reinitialize(double t0, FuncEval& func)
 {
     m_t0  = t0;
     m_time = t0;
-    //try {
     func.getInitialConditions(m_t0, m_neq, NV_DATA_S(m_y));
-    //}
-    //catch (CanteraError) {
-    //showErrors();
-    //error("Teminating execution");
-    //}
 
     int result;
 
@@ -409,7 +402,7 @@ void CVodesIntegrator::integrate(double tout)
 {
     int flag = CVode(m_cvode_mem, tout, m_y, &m_time, CV_NORMAL);
     if (flag != CV_SUCCESS) {
-        throw CVodesErr(" CVodes error encountered. Error code: " + int2str(flag) +
+        throw CVodesErr("CVodes error encountered. Error code: " + int2str(flag) + "\n" + m_error_message +
                         "\nComponents with largest weighted error estimates:\n" + getErrorInfo(10));
     }
     m_sens_ok = false;
@@ -419,7 +412,7 @@ double CVodesIntegrator::step(double tout)
 {
     int flag = CVode(m_cvode_mem, tout, m_y, &m_time, CV_ONE_STEP);
     if (flag != CV_SUCCESS) {
-        throw CVodesErr(" CVodes error encountered. Error code: " + int2str(flag) +
+        throw CVodesErr("CVodes error encountered. Error code: " + int2str(flag) + "\n" + m_error_message +
                         "\nComponents with largest weighted error estimates:\n" + getErrorInfo(10));
 
     }
@@ -432,7 +425,6 @@ int CVodesIntegrator::nEvals() const
     long int ne;
     CVodeGetNumRhsEvals(m_cvode_mem, &ne);
     return ne;
-    //return m_iopt[NFE];
 }
 
 double CVodesIntegrator::sensitivity(size_t k, size_t p)

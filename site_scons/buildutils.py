@@ -13,6 +13,7 @@ import itertools
 
 import SCons.Errors
 import SCons
+import SCons.Node.FS
 from distutils.version import LooseVersion
 import distutils.sysconfig
 
@@ -92,8 +93,8 @@ Up-to-date tests skipped: %(skipped)s
 Tests failed: %(failed)s
 %(failures)s
 *****************************""" % dict(
-            passed=len(self.passed),
-            failed=len(self.failed),
+            passed=sum(self.passed.values()),
+            failed=sum(self.failed.values()),
             skipped=len(self.tests),
             failures=failures)
 
@@ -146,6 +147,9 @@ def regression_test(target, source, env):
                                stdout=outfile, stderr=outfile,
                                cwd=dir, env=env['ENV'])
 
+    if code:
+        print 'FAILED (program exit code:{0})'.format(code)
+
     diff = 0
     # Compare output files
     comparisons = env['test_comparisons']
@@ -154,13 +158,14 @@ def regression_test(target, source, env):
 
     for blessed,output in comparisons:
         print """Comparing '%s' with '%s'""" % (blessed, output)
-        diff |= compareFiles(env, pjoin(dir, blessed), pjoin(dir, output))
+        d = compareFiles(env, pjoin(dir, blessed), pjoin(dir, output))
+        if d:
+            print 'FAILED'
+        diff |= d
 
     del testResults.tests[env['active_test_name']]
 
     if diff or code:
-        print 'FAILED'
-
         if os.path.exists(target[0].abspath):
             os.path.unlink(target[0].abspath)
 
@@ -555,7 +560,7 @@ def getSpawn(env):
     Adapted from http://www.scons.org/wiki/LongCmdLinesOnWin32
     """
 
-    if sys.platform != 'win32' or env['toolchain'] != 'mingw':
+    if 'cmd.exe' not in env['SHELL'] or env.subst('$CXX') == 'cl':
         return env['SPAWN']
 
     try:
@@ -604,3 +609,8 @@ def getCommandOutput(cmd, *args):
         raise OSError(err)
 
     return data.strip()
+
+# Monkey patch for SCons Cygwin bug
+# See http://scons.tigris.org/issues/show_bug.cgi?id=2664
+if 'cygwin' in platform.system().lower():
+    SCons.Node.FS._my_normcase = lambda x: x

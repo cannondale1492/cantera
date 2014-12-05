@@ -7,8 +7,8 @@
 // Copyright 2001  California Institute of Technology
 
 #include "cantera/kinetics/ImplicitSurfChem.h"
-#include "cantera/numerics/Integrator.h"
 #include "cantera/kinetics/solveSP.h"
+#include "cantera/thermo/SurfPhase.h"
 
 using namespace std;
 
@@ -51,9 +51,7 @@ ImplicitSurfChem::ImplicitSurfChem(vector<InterfaceKinetics*> k) :
         m_nsp.push_back(nsp);
         m_nv += m_nsp.back();
         nt = k[n]->nTotalSpecies();
-        if (nt > ntmax) {
-            ntmax = nt;
-        }
+        ntmax = std::max(nt, ntmax);
         m_specStartIndex.push_back(kinSpIndex);
         kinSpIndex += nsp;
 
@@ -298,8 +296,7 @@ void ImplicitSurfChem::setConcSpecies(const doublereal* const vecConcSpecies)
     }
 }
 
-void ImplicitSurfChem::
-setCommonState_TP(doublereal TKelvin, doublereal PresPa)
+void ImplicitSurfChem::setCommonState_TP(doublereal TKelvin, doublereal PresPa)
 {
     for (size_t ip = 0; ip < m_nsurf; ip++) {
         ThermoPhase* TP_ptr = m_surf[ip];

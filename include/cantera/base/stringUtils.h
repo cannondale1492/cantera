@@ -14,9 +14,6 @@
 namespace Cantera
 {
 
-class Phase;
-class ThermoPhase;
-
 //! Convert a double into a c++ string
 /*!
  * @param x double to be converted
@@ -36,6 +33,15 @@ std::string int2str(const int n, const std::string& fmt="%d");
  *  @param n          int to be converted
  */
 std::string int2str(const size_t n);
+
+//!  Convert a vector to a string (separated by commas)
+/*!
+ *  @param v     vector to be converted
+ *  @param fmt   Format to be used (printf style) for each element
+ *  @param sep   Separator
+ */
+std::string vec2str(const vector_fp& v, const std::string& fmt="%g",
+                    const std::string& sep=", ");
 
 //! Strip the leading and trailing white space from a string
 /*!
@@ -82,11 +88,12 @@ std::string lowercase(const std::string& s);
  *
  *  @param ss    original string consisting of multiple key:composition
  *               pairs on multiple lines
- *  @param names valid names for elements in the composition map
+ *  @param names (optional) valid names for elements in the composition map. If
+ *      empty or unspecified, all values are allowed.
  *  @return     map of names to values
  */
 compositionMap parseCompString(const std::string& ss,
-                               const std::vector<std::string>& names);
+        const std::vector<std::string>& names=std::vector<std::string>());
 
 //! Parse a composition string into individual key:composition pairs
 /*!
@@ -94,6 +101,7 @@ compositionMap parseCompString(const std::string& ss,
  *              pairs on multiple lines
  *  @param w    Output vector consisting of single key:composition
  *              items in each index.
+ *  @deprecated Unused. To be removed after Cantera 2.2.
  */
 void split(const std::string& ss, std::vector<std::string>& w);
 
@@ -104,6 +112,7 @@ void split(const std::string& ss, std::vector<std::string>& w);
  *   @param a       Output pointer to a vector of floats
  *   @param delim   character delimiter. Defaults to a space
  *   @return        Returns the number of floats found and converted
+ *  @deprecated Unused. To be removed after Cantera 2.2.
  */
 int fillArrayFromString(const std::string& str, doublereal* const a,
                         const char delim = ' ');
@@ -114,6 +123,7 @@ int fillArrayFromString(const std::string& str, doublereal* const a,
  *
  *  @param infile      Input file name
  *  @return Returns a logfile name
+ *  @deprecated Unused function to be removed after Cantera 2.2.
  */
 std::string logfileName(const std::string& infile);
 
@@ -123,6 +133,7 @@ std::string logfileName(const std::string& infile);
  *                     of the full file name
  *
  *  @return Returns the basename
+ *  @deprecated Unused function to be removed after Cantera 2.2.
  */
 std::string getBaseName(const std::string& fullPath);
 
@@ -193,22 +204,6 @@ std::string parseSpeciesName(const std::string& nameStr, std::string& phaseName)
  */
 std::string wrapString(const std::string& s,
                        const int len=70);
-
-//! Routine strips off white space from a c character string
-/*!
- *  This routine strips off blanks and tabs (only leading and trailing
- *  characters) in 'str'.  On return, it returns the number of
- *  characters still included in the string (excluding the null character).
- *
- *  Comments are excluded -> All instances of the comment character, '!', are
- *  replaced by NULL character thereby terminating the string.
- *
- *  @param str On output 'str' contains the same characters as on input except
- *             the leading and trailing white space and comments have been
- *             removed.
- *  @deprecated
- */
-int stripLTWScstring(char str[]);
 
 //! Interpret one or two token string as a single double
 /*!

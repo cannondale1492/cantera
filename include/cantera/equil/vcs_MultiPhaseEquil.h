@@ -5,9 +5,9 @@
 #ifndef VCS_MULTIPHASEEQUIL_H
 #define VCS_MULTIPHASEEQUIL_H
 
-#include "cantera/base/ct_defs.h"
 #include "MultiPhase.h"
-#include "vcs_defs.h"
+#include "vcs_solve.h"
+#include "vcs_prob.h"
 
 namespace Cantera
 {
@@ -46,7 +46,8 @@ namespace Cantera
  *  @param loglevel Controls amount of diagnostic output. loglevel
  *                  = 0 suppresses diagnostics, and increasingly-verbose
  *                  messages are written as loglevel increases.
- *
+ *  @deprecated Use ThermoPhase::equilibrate instead. To be removed after
+ *      Cantera 2.2.
  *  @ingroup equilfunctions
  */
 int vcs_equilibrate(thermo_t& s, const char* XY,
@@ -87,7 +88,8 @@ int vcs_equilibrate(thermo_t& s, const char* XY,
  *  @param loglevel Controls amount of diagnostic output. loglevel
  *                  = 0 suppresses diagnostics, and increasingly-verbose
  *                  messages are written as loglevel increases.
- *
+ *  @deprecated Use MultiPhase::equilibrate instead. To be removed after
+ *      Cantera 2.2.
  *  @ingroup equilfunctions
  */
 int vcs_equilibrate(MultiPhase& s, const char* XY,
@@ -129,7 +131,8 @@ int vcs_equilibrate(MultiPhase& s, const char* XY,
  *  @param loglevel Controls amount of diagnostic output. loglevel
  *                  = 0 suppresses diagnostics, and increasingly-verbose
  *                  messages are written as loglevel increases.
- *
+ *  @deprecated Use MultiPhase::equilibrate instead. To be removed after
+ *      Cantera 2.2.
  *  @ingroup equilfunctions
  */
 int vcs_equilibrate_1(MultiPhase& s, int ixy,
@@ -162,8 +165,6 @@ int vcs_determine_PhaseStability(MultiPhase& s, int iphase,
 //! equilibrium solver.
 namespace VCSnonideal
 {
-class VCS_PROB;
-class VCS_SOLVE;
 
 //! Translate a MultiPhase object into a VCS_PROB problem definition object
 /*!
@@ -225,7 +226,7 @@ public:
      */
     vcs_MultiPhaseEquil(Cantera::MultiPhase* mix, int printLvl);
 
-    virtual ~vcs_MultiPhaseEquil();
+    virtual ~vcs_MultiPhaseEquil() {}
 
     //! Return the index of the ith component
     /*!
@@ -482,7 +483,7 @@ protected:
      *  constraints. All of these make the problem statement different than
      *  the simple element conservation statement.
      */
-    VCSnonideal::VCS_PROB* m_vprob;
+    VCSnonideal::VCS_PROB m_vprob;
 
     //! Pointer to the MultiPhase mixture that will be equilibrated.
     /*!
@@ -517,12 +518,12 @@ protected:
      */
     Cantera::vector_int m_species;
 
-    //! Pointer to the object that does all of the equilibration work.
+    //! The object that does all of the equilibration work.
     /*!
      * VCS_SOLVE will have different ordering for species and element constraints
-     * than this object or the VCS_PROB object. This object owns the pointer.
+     * than this object or the VCS_PROB object.
      */
-    VCSnonideal::VCS_SOLVE* m_vsolvePtr;
+    VCSnonideal::VCS_SOLVE m_vsolve;
 };
 
 //! Global hook for turning on and off time printing.

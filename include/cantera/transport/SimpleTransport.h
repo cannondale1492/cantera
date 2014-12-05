@@ -7,17 +7,10 @@
 #ifndef CT_SIMPLETRAN_H
 #define CT_SIMPLETRAN_H
 
-#include "TransportBase.h"
-#include "cantera/numerics/DenseMatrix.h"
-#include "TransportParams.h"
 #include "LiquidTransportParams.h"
 
 namespace Cantera
 {
-
-class LiquidTransportParams;
-
-
 //! Class SimpleTransport implements mixture-averaged transport
 //! properties for liquid phases.
 /*!
@@ -508,16 +501,16 @@ private:
 
     //! Composition dependence of the transport properties
     /*!
-     *   The following coefficients are allowed to have simple
-     *   composition dependencies
+     *   The following coefficients are allowed to have simple composition dependencies
+     *
      *       mixture viscosity
      *       mixture thermal conductivity
      *
-     *   Types of composition dependencies
+     *   Permissible types of composition dependencies
      *    0 - Solvent values (i.e., species 0) contributes only
      *    1 - linear combination of mole fractions;
      */
-    int compositionDepType_;
+    enum LiquidTranMixingModel compositionDepType_;
 
     //! Boolean indicating whether to use the hydrodynamic radius formulation
     /*!
@@ -727,17 +720,6 @@ private:
 
     //! Temporary variable that stores the rho Vc value
     double rhoVc[3];
-
-private:
-
-    //! Throw an exception if this method is invoked.
-    /*!
-     * This probably indicates something is not yet implemented.
-     *
-     * @param msg   Indicates the member function which is not implemented
-     */
-    doublereal err(const std::string& msg) const;
-
 };
 }
 #endif

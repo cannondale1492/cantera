@@ -12,13 +12,11 @@
  *
  * Copyright 2001 California Institute of Technology
  */
-#include "cantera/base/ct_defs.h"
+#include "cantera/base/ctml.h"
 #include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/MineralEQ3.h"
-#include "cantera/thermo/SpeciesThermo.h"
-
 #include "cantera/thermo/ThermoFactory.h"
-#include "cantera/thermo/MineralEQ3.h"
+#include "cantera/base/stringUtils.h"
 
 using namespace std;
 
@@ -78,7 +76,7 @@ MineralEQ3::MineralEQ3(XML_Node& xmlphase, const std::string& id_) :
 MineralEQ3::MineralEQ3(const MineralEQ3&  right) :
     StoichSubstanceSSTP()
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 MineralEQ3&
@@ -142,8 +140,7 @@ doublereal MineralEQ3::thermalExpansionCoeff() const
  * ---- Chemical Potentials and Activities ----
  */
 
-void MineralEQ3::
-getActivityConcentrations(doublereal* c) const
+void MineralEQ3::getActivityConcentrations(doublereal* c) const
 {
     c[0] = 1.0;
 }
@@ -158,8 +155,7 @@ doublereal MineralEQ3::logStandardConc(size_t k) const
     return 0.0;
 }
 
-void MineralEQ3::
-getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
+void MineralEQ3::getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
 {
     for (int i = 0; i < 6; i++) {
         uA[i] = 0;
@@ -170,8 +166,7 @@ getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
  * Properties of the Standard State of the Species in the Solution
  */
 
-void MineralEQ3::
-getStandardChemPotentials(doublereal* mu0) const
+void MineralEQ3::getStandardChemPotentials(doublereal* mu0) const
 {
     getGibbs_RT(mu0);
     mu0[0] *= GasConstant * temperature();
@@ -224,14 +219,6 @@ void MineralEQ3::getIntEnergy_RT_ref(doublereal* urt) const
  * ---- Initialization and Internal functions
  */
 
-void MineralEQ3::initThermo()
-{
-    /*
-     * Call the base class thermo initializer
-     */
-    StoichSubstanceSSTP::initThermo();
-}
-
 void MineralEQ3::setParameters(int n, doublereal* const c)
 {
     doublereal rho = c[0];
@@ -266,7 +253,7 @@ void MineralEQ3::initThermoXML(XML_Node& phaseNode, const std::string& id_)
                            "no standard state mode");
     }
     doublereal volVal = 0.0;
-    string smodel = (*aStandardState)["model"];
+    string smodel = aStandardState->attrib("model");
     if (smodel != "constantVolume") {
         throw CanteraError("MineralEQ3::initThermoXML",
                            "wrong standard state mode");
@@ -348,16 +335,20 @@ void MineralEQ3::convertDGFormation()
             totalSum += na * ge;
         }
     }
-    // Add in the charge
-    // if (m_charge_j != 0.0) {
-    // ename = "H";
-    // ge = LookupGe(ename);
-    // totalSum -= m_charge_j * ge;
-    //}
     // Ok, now do the calculation. Convert to joules kmol-1
     doublereal dg = m_deltaG_formation_pr_tr * 4.184 * 1.0E3;
     //! Store the result into an internal variable.
     m_Mu0_pr_tr = dg + totalSum;
+
+    double Hcalc = m_Mu0_pr_tr + 298.15 * m_Entrop_pr_tr * 4184.0;
+    double DHjmol = m_deltaH_formation_pr_tr * 4184.0;
+
+    // If the discrepancy is greater than 100 cal gmol-1, print an error
+    if (fabs(Hcalc -DHjmol) > 10.* 1.0E6 * 4.184) {
+        throw CanteraError("installMinEQ3asShomateThermoFromXML()",
+                           "DHjmol is not consistent with G and S" +
+                           fp2str(Hcalc) + " vs " + fp2str(DHjmol));
+    }
 }
 
 }

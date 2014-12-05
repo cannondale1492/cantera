@@ -10,18 +10,15 @@
 
 // Cantera includes
 #include "cantera/base/ct_defs.h"
-#include "cantera/base/vec_functions.h"
 #include "cantera/base/ctexceptions.h"
 #include "cantera/thermo/ThermoPhase.h"
-#include "cantera/numerics/DenseMatrix.h"
-
-#include "MultiPhaseEquil.h"
 
 #include <memory>
 
 namespace Cantera
 {
 
+class DenseMatrix;
 /// map property strings to integers
 int _equilflag(const char* xy);
 
@@ -132,7 +129,7 @@ public:
      * @param useThermoPhaseElementPotentials get the initial estimate for the
      *     chemical potentials from the ThermoPhase object (true) or create
      *     our own estimate (false)
-     * @param loglvel Specify amount of debug logging (0 to disable)
+     * @param loglevel Specify amount of debug logging (0 to disable)
      * @return Successful returns are indicated by a return value of 0.
      *     Unsuccessful returns are indicated by a return value of -1 for lack
      *     of convergence or -3 for a singular jacobian.

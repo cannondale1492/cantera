@@ -8,7 +8,7 @@ class TestThermoPhase(utilities.CanteraTest):
     def setUp(self):
         self.phase = ct.Solution('h2o2.xml')
 
-    def teste_phases(self):
+    def test_phases(self):
         self.assertEqual(self.phase.n_phases, 1)
 
     def test_species(self):
@@ -35,8 +35,10 @@ class TestThermoPhase(utilities.CanteraTest):
             kSpec = self.phase.species_index(species)
             self.assertEqual(self.phase.n_atoms(kSpec, mElem), n)
 
-        self.assertRaises(ValueError, lambda: self.phase.n_atoms('C', 'H2'))
-        self.assertRaises(ValueError, lambda: self.phase.n_atoms('H', 'CH4'))
+        with self.assertRaises(ValueError):
+            self.phase.n_atoms('C', 'H2')
+        with self.assertRaises(ValueError):
+            self.phase.n_atoms('H', 'CH4')
 
     def test_weights(self):
         atomic_weights = self.phase.atomic_weights
@@ -64,24 +66,110 @@ class TestThermoPhase(utilities.CanteraTest):
         self.assertNear(X[0], 0.5)
         self.assertNear(X[3], 0.5)
 
-        def set_bad():
+        with self.assertRaises(Exception):
             self.phase.X = 'H2:1.0, CO2:1.5'
 
-        self.assertRaises(Exception, set_bad)
+    def test_setCompositionStringBad(self):
+        X0 = self.phase.X
+        with self.assertRaises(Exception):
+            self.phase.X = 'H2:1.0, O2:asdf'
+        self.assertArrayNear(X0, self.phase.X)
 
-    def test_report(self):
-        report = self.phase.report()
-        self.assertTrue(self.phase.name in report)
-        self.assertTrue('temperature' in report)
+        with self.assertRaises(Exception):
+            self.phase.X = 'H2:1e-x4'
+        self.assertArrayNear(X0, self.phase.X)
+
+        with self.assertRaises(Exception):
+            self.phase.X = 'H2:1e-1.4'
+        self.assertArrayNear(X0, self.phase.X)
+
+    def test_setCompositionDict(self):
+        self.phase.X = {'H2':1.0, 'O2':3.0}
+        X = self.phase.X
+        self.assertNear(X[0], 0.25)
+        self.assertNear(X[3], 0.75)
+
+        self.phase.Y = {'H2':1.0, 'O2':3.0}
+        Y = self.phase.Y
+        self.assertNear(Y[0], 0.25)
+        self.assertNear(Y[3], 0.75)
+
+    def test_getCompositionDict(self):
+        self.phase.X = 'OH:1e-9, O2:0.4, AR:0.6'
+        self.assertEqual(len(self.phase.mole_fraction_dict(1e-7)), 2)
+        self.assertEqual(len(self.phase.mole_fraction_dict()), 3)
+
+        self.phase.Y = 'O2:0.4, AR:0.6'
+        Y1 = self.phase.mass_fraction_dict()
+        self.assertNear(Y1['O2'], 0.4)
+        self.assertNear(Y1['AR'], 0.6)
+
+    def test_setCompositionNoNorm(self):
+        X = np.zeros(self.phase.n_species)
+        X[2] = 1.0
+        X[0] = 0.01
+        self.phase.set_unnormalized_mole_fractions(X)
+        self.assertArrayNear(self.phase.X, X)
+        self.assertNear(sum(X), 1.01)
+
+        Y = np.zeros(self.phase.n_species)
+        Y[2] = 1.0
+        Y[0] = 0.01
+        self.phase.set_unnormalized_mass_fractions(Y)
+        self.assertArrayNear(self.phase.Y, Y)
+        self.assertNear(sum(Y), 1.01)
+
+    def test_setCompositionNoNormBad(self):
+        X = np.zeros(self.phase.n_species - 1)
+        with self.assertRaises(ValueError):
+            self.phase.set_unnormalized_mole_fractions(X)
+
+        with self.assertRaises(ValueError):
+            self.phase.set_unnormalized_mass_fractions([1,2,3])
+
+    @unittest.expectedFailure
+    def test_setCompositionDict_bad1(self):
+        # Non-existent species should raise an exception
+        with self.assertRaises(Exception):
+            self.phase.X = {'H2':1.0, 'HCl':3.0}
+
+    def test_setCompositionDict_bad2(self):
+        with self.assertRaises(Exception):
+            self.phase.Y = {'H2':1.0, 'O2':'xx'}
+
+    def test_setCompositionSlice(self):
+        self.phase['H2', 'O2'].X = 0.1, 0.9
+        X = self.phase.X
+        self.assertNear(X[0], 0.1)
+        self.assertNear(X[3], 0.9)
+
+    def test_setCompositionSlice_bad(self):
+        with self.assertRaises(ValueError):
+            self.phase['H2','O2'].Y = [0.1, 0.2, 0.3]
+
+    def test_full_report(self):
+        report = self.phase.report(threshold=0.0)
+        self.assertIn(self.phase.name, report)
+        self.assertIn('temperature', report)
+        self.assertNotIn('minor', report)
         for name in self.phase.species_names:
-            self.assertTrue(name in report)
+            self.assertIn(name, report)
+
+    def test_default_report(self):
+        self.phase.X = 'H2:0.1, O2:0.9, HO2:1e-10, H2O2:1e-20'
+        report = self.phase.report()
+        self.assertIn('minor', report)
+        for name in (' H2 ', ' O2 ', ' HO2 '):
+            self.assertIn(name, report)
+        for name in (' H2O2 ', ' OH ', ' AR '):
+            self.assertNotIn(name, report)
 
     def test_name(self):
         self.assertEqual(self.phase.name, 'ohmech')
 
         self.phase.name = 'something'
         self.assertEqual(self.phase.name, 'something')
-        self.assertTrue('something' in self.phase.report())
+        self.assertIn('something', self.phase.report())
 
     def test_ID(self):
         self.assertEqual(self.phase.ID, 'ohmech')
@@ -92,13 +180,10 @@ class TestThermoPhase(utilities.CanteraTest):
 
     def test_badLength(self):
         X = np.zeros(5)
-        def set_X():
+        with self.assertRaises(ValueError):
             self.phase.X = X
-        def set_Y():
+        with self.assertRaises(ValueError):
             self.phase.Y = X
-
-        self.assertRaises(ValueError, set_X)
-        self.assertRaises(ValueError, set_Y)
 
     def test_mass_basis(self):
         self.assertEqual(self.phase.basis, 'mass')
@@ -233,6 +318,13 @@ class TestThermoPhase(utilities.CanteraTest):
         with self.assertRaises(AssertionError):
             self.phase.UVX = -4e5, 4.4, 'H2:1.0', -1
 
+    def test_invalid_property(self):
+        x = self.phase
+        with self.assertRaises(AttributeError):
+            x.foobar = 300
+        with self.assertRaises(AttributeError):
+            x.foobar
+
     def check_getters(self):
         T,P,X = self.phase.TPX
         self.assertNear(T, self.phase.T)
@@ -306,6 +398,16 @@ class TestThermoPhase(utilities.CanteraTest):
         self.assertNear(self.phase.reference_pressure, ct.one_atm)
         self.assertNear(self.phase.min_temp, 300.0)
         self.assertNear(self.phase.max_temp, 3500.0)
+
+    def test_unpicklable(self):
+        import pickle
+        with self.assertRaises(NotImplementedError):
+            pickle.dumps(self.phase)
+
+    def test_uncopyable(self):
+        import copy
+        with self.assertRaises(NotImplementedError):
+            copy.copy(self.phase)
 
 
 class TestThermo(utilities.CanteraTest):
@@ -414,7 +516,7 @@ class TestInterfacePhase(utilities.CanteraTest):
     def setUp(self):
         self.gas = ct.Solution('diamond.xml', 'gas')
         self.solid = ct.Solution('diamond.xml', 'diamond')
-        self.interface = ct.Solution('diamond.xml', 'diamond_100',
+        self.interface = ct.Interface('diamond.xml', 'diamond_100',
                                       (self.gas, self.solid))
 
     def test_properties(self):
@@ -452,6 +554,39 @@ class ImportTest(utilities.CanteraTest):
         gas2 = ct.Solution('../data/air-no-reactions.xml', 'notair')
         self.check(gas2, 'notair', 900, 5*101325, 7, 2)
 
+    def test_import_phase_cti_text(self):
+        cti_def = """
+ideal_gas(name='spam', elements='O H',
+          species='gri30: all',
+          options='skip_undeclared_elements',
+          initial_state=state(temperature=350, pressure=2e6))
+"""
+        gas = ct.Solution(source=cti_def)
+        self.check(gas, 'spam', 350, 2e6, 8, 2)
+
+    def test_import_phase_xml_text(self):
+        xml_def = """
+<?xml version="1.0"?>
+<ctml>
+  <validate reactions="yes" species="yes"/>
+  <phase dim="3" id="spam">
+    <elementArray datasrc="elements.xml">O</elementArray>
+    <speciesArray datasrc="gri30.xml#species_data">all
+      <skip element="undeclared"/>
+    </speciesArray>
+    <state>
+      <temperature units="K">350.0</temperature>
+      <pressure units="Pa">2000000.0</pressure>
+    </state>
+    <thermo model="IdealGas"/>
+    <kinetics model="GasKinetics"/>
+    <transport model="None"/>
+  </phase>
+</ctml>"""
+        gas = ct.Solution(source=xml_def)
+        self.check(gas, 'spam', 350, 2e6, 2, 1)
+
+
     def test_checkReactionBalance(self):
-        self.assertRaises(Exception,
-                          lambda: ct.Solution('../data/h2o2_unbalancedReaction.xml'))
+        with self.assertRaises(Exception):
+            ct.Solution('../data/h2o2_unbalancedReaction.xml')

@@ -5,11 +5,8 @@
 // Copyright 2002  California Institute of Technology
 
 #include "cantera/base/ctml.h"
-
-#define CTML_VERSION_1_4_1
-
-#include "cantera/base/global.h"
 #include "cantera/base/stringUtils.h"
+#include "cantera/base/Array.h"
 
 using namespace std;
 using namespace Cantera;
@@ -21,12 +18,7 @@ std::string FP_Format = "%23.15E";
 void addInteger(Cantera::XML_Node& node, const std::string& title, const int val,
                 const std::string& units, const std::string& type)
 {
-#ifdef CTML_VERSION_1_4
-    XML_Node& f = node.addChild("integer", val);
-    f.addAttribute("title", title);
-#else
     XML_Node& f = node.addChild(title, val);
-#endif
     f.addAttribute("vtype", "integer");
     if (type != "") {
         f.addAttribute("type",type);
@@ -41,12 +33,7 @@ void addFloat(Cantera::XML_Node& node, const std::string& title,
               const std::string& type, const doublereal minval,
               const doublereal maxval)
 {
-#ifdef CTML_VERSION_1_4
-    XML_Node& f = node.addChild("float", val, ctml::FP_Format);
-    f.addAttribute("title", title);
-#else
     XML_Node& f = node.addChild(title, val, ctml::FP_Format);
-#endif
     if (type != "") {
         f.addAttribute("type",type);
     }
@@ -95,13 +82,13 @@ void addFloatArray(Cantera::XML_Node& node, const std::string& title, const size
     }
 }
 
-void addNamedFloatArray(Cantera::XML_Node& node, const std::string& name, const int n,
+void addNamedFloatArray(Cantera::XML_Node& node, const std::string& name, const size_t n,
                         const doublereal* const vals, const std::string units,
                         const std::string type, const doublereal minval,
                         const doublereal maxval)
 {
     std::string v = "";
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         v += fp2str(vals[i],FP_Format);
         if (i == n-1) {
             v += "\n";
@@ -167,7 +154,7 @@ void getString(const Cantera::XML_Node& node, const std::string& titleString, st
     XML_Node* s = getByTitle(node, titleString);
     if (s && s->name() == "string") {
         valueString = s->value();
-        typeString = (*s)["type"];
+        typeString = s->attrib("type");
     } else {
         valueString = "";
         typeString = "";
@@ -177,6 +164,7 @@ void getString(const Cantera::XML_Node& node, const std::string& titleString, st
 void getNamedStringValue(const Cantera::XML_Node& node, const std::string& nameString, std::string& valueString,
                          std::string& typeString)
 {
+    warn_deprecated("getNamedStringValue", "To be removed after Cantera 2.2");
     valueString = "";
     typeString = "";
     if (node.hasChild(nameString)) {
@@ -186,8 +174,8 @@ void getNamedStringValue(const Cantera::XML_Node& node, const std::string& nameS
     } else {
         XML_Node* s = getByTitle(node, nameString);
         if (s && s->name() == "string") {
-            valueString = (*s).value();
-            typeString = (*s)["type"];
+            valueString = s->value();
+            typeString = s->attrib("type");
         }
     }
 }
@@ -195,38 +183,12 @@ void getNamedStringValue(const Cantera::XML_Node& node, const std::string& nameS
 void getIntegers(const Cantera::XML_Node& node,
                  std::map<std::string, int>& v)
 {
-    std::vector<XML_Node*> f;
-    node.getChildren("integer",f);
+    std::vector<XML_Node*> f = node.getChildren("integer");
     for (size_t i = 0; i < f.size(); i++) {
         const XML_Node& fi = *f[i];
         if (fi["min"] != "" && fi["max"] != "") {
-            v[fi["title"]] = intValue(fi());
+            v[fi["title"]] = fi.int_value();
         }
-    }
-}
-
-void getFloats(const Cantera::XML_Node& node, std::map<std::string, double>& v,
-               const bool convert)
-{
-    warn_deprecated("ctml::getFloats",
-                    "To be removed in Cantera 2.2.");
-    std::vector<XML_Node*> f;
-    node.getChildren("float",f);
-    for (size_t i = 0; i < f.size(); i++) {
-        const XML_Node& fi = *(f[i]);
-        doublereal x = fpValue(fi());
-        const string& vmin = fi["min"];
-        const string& vmax = fi["max"];
-        if (vmin != "" && x < fpValue(vmin) - Tiny) {
-            writelog("\nWarning: value "+fi()+" is below lower limit of "
-                     +vmin+".\n");
-        }
-        if (fi["max"] != "" && x > fpValue(vmax) + Tiny) {
-            writelog("\nWarning: value "+fi()+" is above upper limit of "
-                     +vmax+".\n");
-        }
-        doublereal fctr = (convert ? toSI(fi["units"]) : 1.0); // toSI(typ,units);
-        v[fi["title"]] = fctr*x;
     }
 }
 
@@ -246,16 +208,16 @@ doublereal getFloatCurrent(const Cantera::XML_Node& node,
                            const std::string& type)
 {
     doublereal fctr = 1.0;
-    doublereal x = fpValue(node());
+    doublereal x = node.fp_value();
     const string& units = node["units"];
     const string& vmin = node["min"];
     const string& vmax = node["max"];
     if (vmin != "" && x < fpValue(vmin) - Tiny) {
-        writelog("\nWarning: value "+node()+" is below lower limit of "
+        writelog("\nWarning: value "+node.value()+" is below lower limit of "
                  +vmin+".\n");
     }
     if (node["max"] != "" && x > fpValue(vmax) + Tiny) {
-        writelog("\nWarning: value "+node()+" is above upper limit of "
+        writelog("\nWarning: value "+node.value()+" is above upper limit of "
                  +vmax+".\n");
     }
     // Note, most types of converters default to toSI() type atm.
@@ -346,15 +308,15 @@ int getInteger(const Cantera::XML_Node& parent, const std::string& name)
                            "no child XML element named " + name);
     }
     const XML_Node& node = parent.child(name);
-    int x = intValue(node());
+    int x = node.int_value();
     const string& vmin = node["min"];
     const string& vmax = node["max"];
     if (vmin != "" && x < intValue(vmin)) {
-        writelog("\nWarning: value "+node()+" is below lower limit of "
+        writelog("\nWarning: value "+node.value()+" is below lower limit of "
                  +vmin+".\n");
     }
     if (node["max"] != "" && x > intValue(vmax)) {
-        writelog("\nWarning: value "+node()+" is above upper limit of "
+        writelog("\nWarning: value "+node.value()+" is above upper limit of "
                  +vmax+".\n");
     }
     return x;
@@ -366,16 +328,14 @@ size_t getFloatArray(const Cantera::XML_Node& node, std::vector<doublereal> & v,
 {
     const Cantera::XML_Node* readNode = &node;
     if (node.name() != nodeName) {
-        vector<Cantera::XML_Node*> ll;
-        node.getChildren(nodeName, ll);
+        vector<Cantera::XML_Node*> ll = node.getChildren(nodeName);
         if (ll.size() == 0) {
             throw CanteraError("getFloatArray",
                                "wrong xml element type/name: was expecting "
                                + nodeName + "but accessed " + node.name());
         } else {
             readNode = ll[0];
-            ll.clear();
-            readNode->getChildren("floatArray", ll);
+            ll = readNode->getChildren("floatArray");
             if (ll.size() > 0) {
                 readNode = ll[0];
             }

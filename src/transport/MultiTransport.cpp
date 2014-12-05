@@ -8,11 +8,8 @@
  */
 
 #include "cantera/transport/MultiTransport.h"
-#include "cantera/numerics/ctlapack.h"
-#include "cantera/base/utilities.h"
 #include "cantera/transport/TransportParams.h"
 #include "cantera/thermo/IdealGasPhase.h"
-#include "cantera/transport/TransportFactory.h"
 #include "cantera/base/stringUtils.h"
 
 using namespace std;
@@ -189,19 +186,11 @@ void MultiTransport::solveLMatrixEquation()
     // in m_a should provide a good starting guess, so convergence
     // should be fast.
 
-    //if (m_gmres) {
-    //    gmres(m_mgmres, 3*m_nsp, m_Lmatrix, m_b.begin(),
-    //        m_a.begin(), m_eps_gmres);
-    //    m_lmatrix_soln_ok = true;
-    //    m_l0000_ok = true;            // L matrix not modified by GMRES
-    //}
-    //else {
     copy(m_b.begin(), m_b.end(), m_a.begin());
     try {
         solve(m_Lmatrix, DATA_PTR(m_a));
     } catch (CanteraError& err) {
         err.save();
-        //if (info != 0) {
         throw CanteraError("MultiTransport::solveLMatrixEquation",
                            "error in solving L matrix.");
     }
@@ -264,11 +253,6 @@ void MultiTransport::getSpeciesFluxes(size_t ndim, const doublereal* const grad_
     for (size_t n = 0; n < ldx*ndim; n++) {
         grx[n] = grad_X[n];
     }
-    //for (n = 0; n < ndim; n++) {
-    //    gsave[n] = grad_X[jmax + n*ldx];   // save the input mole frac gradient
-    //grad_X[jmax + n*ldx] = 0.0;
-    //    grx[jmax + n*ldx] = 0.0;
-    // }
 
     // copy grad_X to fluxes
     const doublereal* gx;
@@ -279,25 +263,16 @@ void MultiTransport::getSpeciesFluxes(size_t ndim, const doublereal* const grad_
     }
 
     // use LAPACK to solve the equations
-    int info=0;
-    ct_dgetrf(static_cast<int>(m_aa.nRows()),
-              static_cast<int>(m_aa.nColumns()), m_aa.ptrColumn(0),
-              static_cast<int>(m_aa.nRows()),
-              &m_aa.ipiv()[0], info);
-    if (info == 0) {
-        ct_dgetrs(ctlapack::NoTranspose,
-                  static_cast<int>(m_aa.nRows()), ndim,
-                  m_aa.ptrColumn(0), static_cast<int>(m_aa.nRows()),
-                  &m_aa.ipiv()[0], fluxes, ldf, info);
-        if (info != 0) {
-            info += 100;
-        }
-    } else
+    int info = m_aa.factor();
+    if (info) {
         throw CanteraError("MultiTransport::getSpeciesFluxes",
-                           "Error in DGETRF");
-    if (info > 50)
+                           "Error factorizing matrix.");
+    }
+    info = m_aa.solve(fluxes, ndim, ldf);
+    if (info) {
         throw CanteraError("MultiTransport::getSpeciesFluxes",
-                           "Error in DGETRS");
+                           "Error solving linear system.");
+    }
 
     size_t offset;
     doublereal pp = pressure_ig();
@@ -310,7 +285,6 @@ void MultiTransport::getSpeciesFluxes(size_t ndim, const doublereal* const grad_
         for (size_t i = 0; i < m_nsp; i++) {
             fluxes[i + offset] *= rho * y[i] / pp;
         }
-        //grad_X[jmax + n*ldx] = gsave[n];
     }
 
     // thermal diffusion
@@ -397,22 +371,17 @@ void MultiTransport::getMassFluxes(const doublereal* state1, const doublereal* s
     }
     fluxes[jmax] = 0.0;
 
-    // use LAPACK to solve the equations
-    int info=0;
-    size_t nr = m_aa.nRows();
-    size_t nc = m_aa.nColumns();
-
-    ct_dgetrf(nr, nc, m_aa.ptrColumn(0), nr, &m_aa.ipiv()[0], info);
-    if (info == 0) {
-        int ndim = 1;
-        ct_dgetrs(ctlapack::NoTranspose, nr, ndim,
-                  m_aa.ptrColumn(0), nr, &m_aa.ipiv()[0], fluxes, nr, info);
-        if (info != 0)
-            throw CanteraError("MultiTransport::getMassFluxes",
-                               "Error in DGETRS. Info = "+int2str(info));
-    } else
+    // Solve the equations
+    int info = m_aa.factor();
+    if (info) {
         throw CanteraError("MultiTransport::getMassFluxes",
-                           "Error in DGETRF.  Info = "+int2str(info));
+                           "Error in factorization.  Info = "+int2str(info));
+    }
+    info = m_aa.solve(fluxes);
+    if (info) {
+        throw CanteraError("MultiTransport::getMassFluxes",
+                           "Error in linear solve. Info = "+int2str(info));
+    }
 
     doublereal pp = pressure_ig();
 
@@ -468,7 +437,6 @@ void MultiTransport::getMultiDiffCoeffs(const size_t ld, doublereal* const d)
     m_l0000_ok = false;           // matrix is overwritten by inverse
     m_lmatrix_soln_ok = false;
 
-    //doublereal pres = m_thermo->pressure();
     doublereal prefactor = 16.0 * m_temp
                            * m_thermo->meanMolecularWeight()/(25.0 * p);
     doublereal c;
@@ -578,7 +546,6 @@ void MultiTransport::updateThermal_T()
         m_cinternal[k] = cp[k] - 2.5;
     }
 
-    // m_thermo->update_T(m_update_thermal_T);
     m_thermal_tlast = m_thermo->temperature();
 }
 
@@ -619,7 +586,6 @@ void MultiTransport::eval_L0010(const doublereal* const x)
 
     doublereal sum, wj, xj;
     for (size_t j = 0; j < m_nsp; j++) {
-        //constant = prefactor * x[j];
         xj = x[j];
         wj = m_mw[j];
         sum = 0.0;

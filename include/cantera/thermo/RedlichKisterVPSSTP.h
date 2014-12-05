@@ -21,7 +21,6 @@
 #define CT_REDLICHKISTERVPSSTP_H
 
 #include "cantera/thermo/GibbsExcessVPSSTP.h"
-#include "cantera/base/Array.h"
 
 namespace Cantera
 {
@@ -315,19 +314,6 @@ public:
      */
     virtual ThermoPhase* duplMyselfAsThermoPhase() const;
 
-    //! @name  Utilities
-    //! @{
-
-    //! Equation of state type flag.
-    /*!
-     * The ThermoPhase base class returns
-     * zero. Subclasses should define this to return a unique
-     * non-zero value. Known constants defined for this purpose are
-     * listed in mix_defs.h.
-     */
-    virtual int eosType() const;
-
-    //! @}
     //! @name  Molar Thermodynamic Properties
     //! @{
 
@@ -491,8 +477,7 @@ public:
     /// The following methods are used in the process of constructing
     /// the phase and setting its parameters from a specification in an
     /// input file. They are not normally used in application programs.
-    /// To see how they are used, see files importCTML.cpp and
-    /// ThermoFactory.cpp.
+    /// To see how they are used, see importPhase().
 
     /*!
      * @internal Initialize. This method is provided to allow
@@ -503,9 +488,7 @@ public:
      * and subclasses that do not require initialization do not
      * need to overload this method.  When importing a CTML phase
      * description, this method is called just prior to returning
-     * from function importPhase.
-     *
-     * @see importCTML.cpp
+     * from function importPhase().
      */
     virtual void initThermo();
 
@@ -657,15 +640,6 @@ public:
      */
     void Vint(double& VintOut, double& voltsOut) ;
 #endif
-
-private:
-    //! Error function
-    /*!
-     *  Print an error string and exit
-     *
-     * @param msg  Message to be printed
-     */
-    doublereal err(const std::string& msg) const;
 
 protected:
     //! number of binary interaction expressions

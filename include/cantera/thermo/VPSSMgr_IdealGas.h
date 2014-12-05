@@ -15,18 +15,10 @@
 #ifndef CT_VPSSMGR_IDEALGAS_H
 #define CT_VPSSMGR_IDEALGAS_H
 
-#include "cantera/base/ct_defs.h"
-#include "PDSS.h"
 #include "VPSSMgr.h"
 
 namespace Cantera
 {
-
-class SpeciesThermoInterpType;
-class VPStandardStateTP;
-class SpeciesThermo;
-
-
 //! A VPSSMgr where all species in the phase obey an ideal gas equation of state
 class VPSSMgr_IdealGas : public VPSSMgr
 {
@@ -67,7 +59,7 @@ public:
      * The following methods are used in the process of constructing the phase
      * and setting its parameters from a specification in an input file. They
      * are not normally used in application programs. To see how they are
-     * used, see files importCTML.cpp and ThermoFactory.cpp.
+     * used, see importPhase().
      */
     //@{
     virtual void initThermoXML(XML_Node& phaseNode, const std::string& id);

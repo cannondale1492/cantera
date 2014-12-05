@@ -13,9 +13,8 @@
  */
 
 #include "cantera/thermo/VPSSMgr_General.h"
-#include "cantera/thermo/PDSS.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/ctml.h"
+#include "cantera/thermo/VPStandardStateTP.h"
 #include "cantera/thermo/PDSS_IdealGas.h"
 #include "cantera/thermo/PDSS_Water.h"
 #include "cantera/thermo/PDSS_ConstVol.h"
@@ -23,6 +22,7 @@
 #include "cantera/thermo/PDSS_HKFT.h"
 #include "cantera/thermo/PDSS_IonsFromNeutral.h"
 #include "cantera/thermo/GeneralSpeciesThermo.h"
+#include "cantera/base/vec_functions.h"
 
 using namespace std;
 
@@ -156,7 +156,7 @@ VPSSMgr_General::returnPDSS_ptr(size_t k, const XML_Node& speciesNode,
         kPDSS = new PDSS_IdealGas(m_vptp_ptr, k, speciesNode, *phaseNode_ptr, true);
         return kPDSS;
     }
-    std::string model = (*ss)["model"];
+    std::string model = ss->attrib("model");
     if (model == "constant_incompressible") {
         VPSSMgr::installSTSpecies(k, speciesNode, phaseNode_ptr);
         kPDSS = new PDSS_ConstVol(m_vptp_ptr, k, speciesNode, *phaseNode_ptr, true);
@@ -164,7 +164,6 @@ VPSSMgr_General::returnPDSS_ptr(size_t k, const XML_Node& speciesNode,
             throw CanteraError("VPSSMgr_General::returnPDSS_ptr", "new PDSS_ConstVol failed");
         }
     } else if (model == "waterIAPWS" || model == "waterPDSS") {
-        // VPSSMgr::installSTSpecies(k, speciesNode, phaseNode_ptr);
         kPDSS = new PDSS_Water(m_vptp_ptr, 0);
         if (!genSpthermo) {
             throw CanteraError("VPSSMgr_General::returnPDSS_ptr",
@@ -213,24 +212,13 @@ VPSSMgr_General::createInstallPDSS(size_t k, const XML_Node& speciesNode,
 {
     bool doST;
     PDSS* kPDSS = returnPDSS_ptr(k, speciesNode, phaseNode_ptr, doST);
-    // VPSSMgr::installSTSpecies(k, speciesNode, phaseNode_ptr);
     if (m_PDSS_ptrs.size() < k+1) {
         m_PDSS_ptrs.resize(k+1, 0);
     }
     m_PDSS_ptrs[k] = kPDSS;
-    if ((k+1) >= m_kk) {
-        m_kk = k+1;
-    }
-
-    doublereal minTemp = kPDSS->minTemp();
-    if (minTemp > m_minTemp) {
-        m_minTemp = minTemp;
-    }
-
-    doublereal maxTemp = kPDSS->maxTemp();
-    if (maxTemp < m_maxTemp) {
-        m_maxTemp = maxTemp;
-    }
+    m_kk = std::max(m_kk, k+1);
+    m_minTemp = std::max(m_minTemp, kPDSS->minTemp());
+    m_maxTemp = std::min(m_maxTemp, kPDSS->maxTemp());
 
     doublereal p0 = kPDSS->refPressure();
     if (k == 0) {

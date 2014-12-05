@@ -20,7 +20,7 @@ using Cantera::handleAllExceptions;
 #include "clib/Cabinet.h"
 
 typedef Cabinet<XML_Node, false> XmlCabinet;
-template<> XmlCabinet* XmlCabinet::__storage = 0;
+template<> XmlCabinet* XmlCabinet::s_storage = 0;
 
 typedef integer status_t;
 
@@ -310,7 +310,6 @@ extern "C" {
             for (int i = 0; i < nv; i++) {
                 data[i] = v[i];
             }
-            //n = nv;
         } catch (...) {
             return handleAllExceptions(-1, ERR);
         }

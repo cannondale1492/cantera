@@ -10,10 +10,6 @@
 #ifndef CT_BANDMATRIX_H
 #define CT_BANDMATRIX_H
 
-#include "cantera/base/ct_defs.h"
-#include "ctlapack.h"
-#include "cantera/base/utilities.h"
-#include "cantera/base/ctexceptions.h"
 #include "GeneralMatrix.h"
 
 namespace Cantera
@@ -184,14 +180,16 @@ public:
 
     //! Solve the matrix problem Ax = b
     /*!
-     *  @param b  INPUT rhs of the problem
-     *            OUTPUT solution to the problem
+     *  @param b     INPUT rhs of the problem
+     *               OUTPUT solution to the problem
+     *  @param nrhs  Number of right hand sides to solve
+     *  @param ldb   Leading dimension of `b`. Default is nColumns()
      *
      * @return Return a success flag
      *          0 indicates a success
      *         ~0  Some error occurred, see the LAPACK documentation
      */
-    int solve(doublereal* b);
+    int solve(doublereal* b, size_t nrhs=1, size_t ldb=0);
 
     //! Returns an iterator for the start of the band storage data
     /*!
@@ -219,22 +217,6 @@ public:
 
     virtual void zero();
 
-    //! Factors the A matrix using the QR algorithm, overwriting A
-    /*!
-     * we set m_factored to 2 to indicate the matrix is now QR factored
-     *
-     * @return  Returns the info variable from lapack
-     */
-    virtual int factorQR();
-
-    //! Returns an estimate of the inverse of the condition number for the matrix
-    /*!
-     *   The matrix must have been previously factored using the QR algorithm
-     *
-     * @return  returns the inverse of the condition number
-     */
-    virtual doublereal rcondQR();
-
     //! Returns an estimate of the inverse of the condition number for the matrix
     /*!
      *   The matrix must have been previously factored using the LU algorithm
@@ -245,30 +227,14 @@ public:
      */
     virtual doublereal rcond(doublereal a1norm);
 
-    //! Change the way the matrix is factored
-    /*!
-     *  @param fAlgorithm   integer
-     *                   0 LU factorization
-     *                   1 QR factorization
-     */
-    virtual void useFactorAlgorithm(int fAlgorithm);
-
-    //! Returns the factor algorithm used
-    /*!
-     *     0 LU decomposition
-     *     1 QR decomposition
-     *
-     * This routine will always return 0
-     */
+    //! Returns the factor algorithm used.  This method will always return 0
+    //! (LU) for band matrices.
     virtual int factorAlgorithm() const;
 
     //! Returns the one norm of the matrix
     virtual doublereal oneNorm() const;
 
     virtual GeneralMatrix* duplMyselfAsGeneralMatrix() const;
-
-    //! Report whether the current matrix has been factored.
-    virtual bool factored() const;
 
     //! Return a pointer to the top of column j, column values are assumed to be contiguous in memory
     /*!
@@ -307,11 +273,9 @@ public:
     /*!
      *  This differs from the assignment operator as no resizing is done and memcpy() is used.
      *  @param y Array to be copied
+     *  @deprecated To be removed after Cantera 2.2.
      */
     virtual void copyData(const GeneralMatrix& y);
-
-    //! Clear the factored flag
-    virtual void clearFactorFlag();
 
     //! Check to see if we have any zero rows in the jacobian
     /*!
@@ -335,6 +299,15 @@ public:
      */
     virtual size_t checkColumns(doublereal& valueSmall) const;
 
+    //! Change the way the matrix is factored
+    /*!
+     *  @param fAlgorithm   integer
+     *                   0 LU factorization
+     *                   1 QR factorization
+     */
+    virtual void useFactorAlgorithm(int fAlgorithm);
+
+
 protected:
 
     //! Matrix data
@@ -342,9 +315,6 @@ protected:
 
     //! Factorized data
     vector_fp ludata;
-
-    //! Boolean indicating whether the matrix is factored
-    bool m_factored;
 
     //! Number of rows and columns of the matrix
     size_t m_n;
@@ -369,14 +339,6 @@ protected:
 
     //! Extra dp work array needed - size = 3n
     vector_fp work_;
-
-private:
-
-    //! Error function that gets called for unhandled cases
-    /*!
-     * @param msg String containing the message.
-     */
-    void err(const std::string& msg) const;
 };
 
 //! Utility routine to print out the matrix

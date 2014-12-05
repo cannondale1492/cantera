@@ -8,12 +8,8 @@
  * Contract DE-AC04-94AL85000 with Sandia Corporation, the
  * U.S. Government retains certain rights in this software.
  */
-#include "cantera/base/ct_defs.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/ctml.h"
 #include "cantera/thermo/PDSS_ConstVol.h"
-#include "cantera/thermo/ThermoFactory.h"
-
 #include "cantera/thermo/VPStandardStateTP.h"
 
 #include <fstream>
@@ -88,7 +84,7 @@ void PDSS_ConstVol::constructPDSSXML(VPStandardStateTP* tp, size_t spindex,
         throw CanteraError("PDSS_ConstVol::constructPDSSXML",
                            "no standardState Node for species " + speciesNode.name());
     }
-    std::string model = (*ss)["model"];
+    std::string model = ss->attrib("model");
     if (model != "constant_incompressible") {
         throw CanteraError("PDSS_ConstVol::initThermoXML",
                            "standardState model for species isn't constant_incompressible: " + speciesNode.name());
@@ -97,7 +93,6 @@ void PDSS_ConstVol::constructPDSSXML(VPStandardStateTP* tp, size_t spindex,
     m_constMolarVolume = ctml::getFloat(*ss, "molarVolume", "toSI");
 
     std::string id = "";
-    // initThermoXML(phaseNode, id);
 }
 
 void PDSS_ConstVol::constructPDSSFile(VPStandardStateTP* tp, size_t spindex,
@@ -157,14 +152,6 @@ void PDSS_ConstVol::initThermo()
 }
 
 doublereal
-PDSS_ConstVol::enthalpy_mole() const
-{
-    doublereal val = enthalpy_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
-}
-
-doublereal
 PDSS_ConstVol::enthalpy_RT() const
 {
     return m_hss_RT_ptr[m_spindex];
@@ -180,37 +167,15 @@ PDSS_ConstVol::intEnergy_mole() const
 }
 
 doublereal
-PDSS_ConstVol::entropy_mole() const
-{
-    doublereal val = entropy_R();
-    return val * GasConstant;
-}
-
-doublereal
 PDSS_ConstVol::entropy_R() const
 {
     return m_sss_R_ptr[m_spindex];
 }
 
 doublereal
-PDSS_ConstVol::gibbs_mole() const
-{
-    doublereal val = gibbs_RT();
-    doublereal RT = GasConstant * m_temp;
-    return val * RT;
-}
-
-doublereal
 PDSS_ConstVol::gibbs_RT() const
 {
     return m_gss_RT_ptr[m_spindex];
-}
-
-doublereal
-PDSS_ConstVol::cp_mole() const
-{
-    doublereal val = m_cpss_R_ptr[m_spindex];
-    return val * GasConstant;
 }
 
 doublereal
@@ -263,24 +228,6 @@ doublereal PDSS_ConstVol::cp_R_ref() const
 doublereal PDSS_ConstVol::molarVolume_ref() const
 {
     return m_V0_ptr[m_spindex];
-}
-
-doublereal PDSS_ConstVol::critTemperature() const
-{
-    throw CanteraError("PDSS_ConstVol::critTemperature()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_ConstVol::critPressure() const
-{
-    throw CanteraError("PDSS_ConstVol::critPressure()", "unimplemented");
-    return 0.0;
-}
-
-doublereal PDSS_ConstVol::critDensity() const
-{
-    throw CanteraError("PDSS_ConstVol::critDensity()", "unimplemented");
-    return 0.0;
 }
 
 void PDSS_ConstVol::setPressure(doublereal p)

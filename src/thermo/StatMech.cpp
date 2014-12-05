@@ -10,7 +10,9 @@
 
 namespace Cantera
 {
-StatMech::StatMech() {}
+StatMech::StatMech() {
+    warn_deprecated("class StatMech", "To be removed after Cantera 2.2");
+}
 
 StatMech::StatMech(int n, doublereal tlow, doublereal thigh,
                    doublereal pref,
@@ -563,7 +565,6 @@ void StatMech::updateProperties(const doublereal* tt,
     if (name_map.find(sp_name)  != name_map.end()) {
         s = name_map.find(sp_name)->second;
     } else {
-        //std::cout << sp_name << std::endl;
         throw CanteraError("StatMech.cpp",
                            "species properties not found!. \n\n");
     }
@@ -628,7 +629,6 @@ void StatMech::reportParameters(size_t& n, int& type,
     if (name_map.find(sp_name)  != name_map.end()) {
         s = name_map.find(sp_name)->second;
     } else {
-        //std::cout << sp_name << std::endl;
         throw CanteraError("StatMech.cpp",
                            "species properties not found!. \n\n");
     }

@@ -8,7 +8,6 @@
 #define KINETICS_FACTORY_H
 
 #include "Kinetics.h"
-#include "cantera/base/xml.h"
 #include "cantera/base/FactoryBase.h"
 #include "cantera/base/ct_thread.h"
 
@@ -64,8 +63,7 @@ public:
      *
      * @return Pointer to the new kinetics manager.
      */
-    virtual Kinetics* newKinetics(XML_Node& phase,
-                                  std::vector<ThermoPhase*> th);
+    virtual Kinetics* newKinetics(XML_Node& phase, std::vector<ThermoPhase*> th);
 
     /**
      * Return a new, empty kinetics manager.

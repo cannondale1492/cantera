@@ -18,6 +18,8 @@
 #include "cantera/thermo/PDSS_Water.h"
 #include "cantera/thermo/PDSS_ConstVol.h"
 #include "cantera/thermo/GeneralSpeciesThermo.h"
+#include "cantera/thermo/VPStandardStateTP.h"
+#include "cantera/base/ctml.h"
 
 using namespace std;
 
@@ -229,13 +231,13 @@ VPSSMgr_Water_ConstVol::initThermoXML(XML_Node& phaseNode, const std::string& id
         }
         const XML_Node* ss = s->findByName("standardState");
         if (!ss) {
-            std::string sName = s->operator[]("name");
+            std::string sName = s->attrib("name");
             throw CanteraError("VPSSMgr_Water_ConstVol::initThermoXML",
                                "no standardState Node for species " + sName);
         }
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "constant_incompressible") {
-            std::string sName = s->operator[]("name");
+            std::string sName = s->attrib("name");
             throw CanteraError("VPSSMgr_Water_ConstVol::initThermoXML",
                                "standardState model for species isn't "
                                "constant_incompressible: " + sName);
@@ -259,7 +261,7 @@ VPSSMgr_Water_ConstVol::createInstallPDSS(size_t k, const XML_Node& speciesNode,
                                "h2o wrong name: " + xn);
         }
         const XML_Node* ss = speciesNode.findByName("standardState");
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "waterIAPWS" && model != "waterPDSS") {
             throw CanteraError("VPSSMgr_Water_ConstVol::installSpecies",
                                "wrong SS mode: " + model);
@@ -282,7 +284,7 @@ VPSSMgr_Water_ConstVol::createInstallPDSS(size_t k, const XML_Node& speciesNode,
             throw CanteraError("VPSSMgr_Water_ConstVol::installSpecies",
                                "no standardState Node for species " + speciesNode.name());
         }
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "constant_incompressible") {
             throw CanteraError("VPSSMgr_Water_ConstVol::initThermoXML",
                                "standardState model for species isn't "

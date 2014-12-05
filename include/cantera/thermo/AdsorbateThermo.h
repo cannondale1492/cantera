@@ -12,7 +12,6 @@
 #define CT_ADSORBATE_H
 
 #include "SpeciesThermoInterpType.h"
-#include "cantera/base/global.h"
 
 namespace Cantera
 {
@@ -65,21 +64,6 @@ public:
     duplMyselfAsSpeciesThermoInterpType() const {
         Adsorbate* np = new Adsorbate(*this);
         return (SpeciesThermoInterpType*) np;
-    }
-
-    virtual void install(const std::string& name, size_t index, int type,
-                         const doublereal* c, doublereal minTemp_, doublereal maxTemp_,
-                         doublereal refPressure_) {
-        m_be = c[1];
-        m_nFreqs = int(c[0]);
-        for (size_t n = 0; n < m_nFreqs; n++) {
-            m_freq[n] = c[n+2];
-        }
-        m_index = index;
-
-        m_lowT  = minTemp_;
-        m_highT = maxTemp_;
-        m_Pref = refPressure_;
     }
 
     virtual int reportType() const {

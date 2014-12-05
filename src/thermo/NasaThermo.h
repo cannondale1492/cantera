@@ -12,8 +12,6 @@
 
 #include "cantera/thermo/SpeciesThermoMgr.h"
 #include "cantera/thermo/NasaPoly1.h"
-#include "cantera/thermo/speciesThermoTypes.h"
-#include "cantera/base/global.h"
 
 namespace Cantera
 {
@@ -43,6 +41,7 @@ namespace Cantera
  * @see importCTML
  *
  * @ingroup mgrsrefcalc
+ * @deprecated To be removed after Cantera 2.2. Use GeneralSpeciesThermo instead.
  */
 class NasaThermo : public SpeciesThermo
 {
@@ -145,8 +144,8 @@ public:
                               doublereal& maxTemp,
                               doublereal& refPressure) const;
 
-    virtual doublereal reportOneHf298(const int k) const;
-    virtual void modifyOneHf298(const int k, const doublereal Hf298New);
+    virtual doublereal reportOneHf298(const size_t k) const;
+    virtual void modifyOneHf298(const size_t k, const doublereal Hf298New);
 
     //! Initialized to the type of parameterization
     /*!
@@ -221,17 +220,17 @@ protected:
      * for that species are stored. group indices start at 1,
      * so a decrement is always performed to access vectors.
      */
-    mutable std::map<size_t, size_t> m_group_map;
+    std::map<size_t, size_t> m_group_map;
 
     /*!
      * This map takes as its index, the species index in the phase.
      * It returns the position index within the group, where the
      * temperature polynomials for that species are stored.
      */
-    mutable std::map<size_t, size_t> m_posInGroup_map;
+    std::map<size_t, size_t> m_posInGroup_map;
 
     //! Species name as a function of the species index
-    mutable std::map<size_t, std::string> m_name;
+    std::map<size_t, std::string> m_name;
 
 protected:
     //! Compute the nondimensional heat capacity using the given NASA polynomial

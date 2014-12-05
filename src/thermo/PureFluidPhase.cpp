@@ -14,7 +14,6 @@
 #include <cstdio>
 
 using std::string;
-using std::endl;
 
 namespace Cantera
 {
@@ -61,8 +60,7 @@ PureFluidPhase::~PureFluidPhase()
     delete m_sub;
 }
 
-void PureFluidPhase::
-initThermo()
+void PureFluidPhase::initThermo()
 {
     delete m_sub;
     m_sub = tpx::GetSub(m_subflag);
@@ -93,8 +91,7 @@ initThermo()
              +id()+"\n", m_verbose);
 }
 
-void PureFluidPhase::
-setParametersFromXML(const XML_Node& eosdata)
+void PureFluidPhase::setParametersFromXML(const XML_Node& eosdata)
 {
     eosdata._require("model","PureFluid");
     m_subflag = atoi(eosdata["fluid_type"].c_str());
@@ -103,50 +100,43 @@ setParametersFromXML(const XML_Node& eosdata)
                            "missing or negative substance flag");
 }
 
-doublereal PureFluidPhase::
-enthalpy_mole() const
+doublereal PureFluidPhase::enthalpy_mole() const
 {
     setTPXState();
     return m_sub->h() * m_mw;
 }
 
-doublereal PureFluidPhase::
-intEnergy_mole() const
+doublereal PureFluidPhase::intEnergy_mole() const
 {
     setTPXState();
     return m_sub->u() * m_mw;
 }
 
-doublereal PureFluidPhase::
-entropy_mole() const
+doublereal PureFluidPhase::entropy_mole() const
 {
     setTPXState();
     return m_sub->s() * m_mw;
 }
 
-doublereal PureFluidPhase::
-gibbs_mole() const
+doublereal PureFluidPhase::gibbs_mole() const
 {
     setTPXState();
     return m_sub->g() * m_mw;
 }
 
-doublereal PureFluidPhase::
-cp_mole() const
+doublereal PureFluidPhase::cp_mole() const
 {
     setTPXState();
     return m_sub->cp() * m_mw;
 }
 
-doublereal PureFluidPhase::
-cv_mole() const
+doublereal PureFluidPhase::cv_mole() const
 {
     setTPXState();
     return m_sub->cv() * m_mw;
 }
 
-doublereal PureFluidPhase::
-pressure() const
+doublereal PureFluidPhase::pressure() const
 {
     setTPXState();
     return m_sub->P();
@@ -208,11 +198,6 @@ void  PureFluidPhase::getPartialMolarVolumes(doublereal* vbar) const
     vbar[0] = 1.0 / molarDensity();
 }
 
-int PureFluidPhase::standardStateConvention() const
-{
-    return cSS_CONVENTION_TEMPERATURE;
-}
-
 void  PureFluidPhase::getActivityConcentrations(doublereal* c) const
 {
     c[0] = 1.0;
@@ -257,7 +242,6 @@ void PureFluidPhase::getEnthalpy_RT_ref(doublereal* hrt) const
 {
     double psave = pressure();
     double t = temperature();
-    //double pref = m_spthermo->refPressure();
     double plow = 1.0E-8;
     Set(tpx::PropertyPair::TP, t, plow);
     getEnthalpy_RT(hrt);
@@ -372,7 +356,7 @@ void PureFluidPhase::setState_Psat(doublereal p, doublereal x)
     setDensity(1.0/m_sub->v());
 }
 
-std::string PureFluidPhase::report(bool show_thermo) const
+std::string PureFluidPhase::report(bool show_thermo, doublereal threshold) const
 {
     char p[800];
     string s = "";

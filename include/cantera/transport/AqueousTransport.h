@@ -10,14 +10,9 @@
 // Cantera includes
 #include "TransportBase.h"
 #include "cantera/numerics/DenseMatrix.h"
-#include "TransportParams.h"
-#include "LiquidTransportParams.h"
 
 namespace Cantera
 {
-
-class LiquidTransportParams;
-
 //! Class AqueousTransport implements mixture-averaged transport
 //! properties for brine phases.
 /*!

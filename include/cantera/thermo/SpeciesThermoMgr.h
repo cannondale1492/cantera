@@ -11,10 +11,10 @@
 #ifndef CT_SPECIESTHERMO_MGR_H
 #define CT_SPECIESTHERMO_MGR_H
 
-#include "cantera/base/ct_defs.h"
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/stringUtils.h"
 #include "SpeciesThermo.h"
+#include "cantera/base/utilities.h"
 
 namespace Cantera
 {
@@ -50,6 +50,7 @@ public:
  *
  * Note this seems to be a slow way to do things, and it may be on its way out.
  *
+ * @deprecated To be removed after Cantera 2.2. Use GeneralSpeciesThermo instead.
  * @ingroup mgrsrefcalc
  */
 template<class T1, class T2>
@@ -57,14 +58,17 @@ class SpeciesThermoDuo : public SpeciesThermo
 {
 public:
     //! Constructor
-    SpeciesThermoDuo() {};
+    SpeciesThermoDuo() {
+        warn_deprecated("class SpeciesThermoDuo", "To be removed after "
+            "Cantera 2.2. Use GeneralSpeciesThermo instead.");
+    };
 
     //! copy constructor
     /*!
      * @param right Object to be copied
      */
     SpeciesThermoDuo(const SpeciesThermoDuo& right) {
-        *this = operator=(right);
+        *this = right;
     }
 
     //! Assignment operator
@@ -107,11 +111,11 @@ public:
                               doublereal& maxTemp,
                               doublereal& refPressure) const;
 
-    virtual doublereal reportOneHf298(int k) const {
+    virtual doublereal reportOneHf298(const size_t k) const {
         throw CanteraError("reportHF298", "unimplemented");
     }
 
-    virtual void modifyOneHf298(const int k, const doublereal Hf298New) {
+    virtual void modifyOneHf298(const size_t k, const doublereal Hf298New) {
         throw CanteraError("reportHF298", "unimplemented");
     }
 
@@ -140,6 +144,7 @@ SpeciesThermoDuo<T1, T2>::operator=(const SpeciesThermoDuo& right)
         return *this;
     }
 
+    SpeciesThermo::operator=(right);
     m_thermo1 = right.m_thermo1;
     m_thermo2 = right.m_thermo2;
     m_p0      = right.m_p0;
@@ -165,16 +170,17 @@ SpeciesThermoDuo<T1, T2>::install(const std::string& name, size_t sp, int type,
 {
     m_p0 = refPressure_;
     if (type == m_thermo1.ID) {
-        m_thermo1.install(name, sp, 0, c, minTemp_, maxTemp_,
+        m_thermo1.install(name, sp, type, c, minTemp_, maxTemp_,
                           refPressure_);
         speciesToType[sp] = m_thermo1.ID;
     } else if (type == m_thermo2.ID) {
-        m_thermo2.install(name, sp, 0, c, minTemp_, maxTemp_,
+        m_thermo2.install(name, sp, type, c, minTemp_, maxTemp_,
                           refPressure_);
         speciesToType[sp] = m_thermo2.ID;
     } else {
         throw UnknownSpeciesThermo("SpeciesThermoDuo:install",type);
     }
+    markInstalled(sp);
 }
 
 template<class T1, class T2>
@@ -190,11 +196,7 @@ template<class T1, class T2>
 int
 SpeciesThermoDuo<T1, T2>::reportType(size_t k) const
 {
-    std::map<size_t, int>::const_iterator p = speciesToType.find(k);
-    if (p != speciesToType.end()) {
-        return p->second;
-    }
-    return -1;
+    return getValue(speciesToType, k, -1);
 }
 
 template<class T1, class T2>
@@ -213,7 +215,7 @@ SpeciesThermoDuo<T1, T2>::reportParams(size_t index, int& type,
         m_thermo2.reportParams(index, type, c, minTemp_, maxTemp_,
                                refPressure_);
     } else {
-        throw CanteraError("  ", "confused");
+        throw CanteraError("SpeciesThermoDuo", "mismatched SpeciesThermoInterpType");
     }
 }
 

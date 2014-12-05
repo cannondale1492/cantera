@@ -11,21 +11,16 @@
  */
 // Copyright 2002  California Institute of Technology
 
+#ifndef CT_IMPORTKINETICS_H
+#define CT_IMPORTKINETICS_H
 
-#ifndef CT_IMPORTCTML_H
-#define CT_IMPORTCTML_H
-
-#include "cantera/thermo/ThermoPhase.h"
 #include "Kinetics.h"
 
 namespace Cantera
 {
 
-class Kinetics;
-class SpeciesThermoFactory;
-class XML_Node;
-
 //! Rules for parsing and installing reactions
+//! @deprecated Unused. To be removed after Cantera 2.2.
 struct ReactionRules {
     ReactionRules();
     bool skipUndeclaredSpecies;
@@ -49,6 +44,8 @@ struct ReactionRules {
  *    stoichiometric coefficients.
  *
  * @ingroup kineticsmgr
+ * @deprecated Now handled by Kinetics::checkDuplicateStoich. To be removed
+ *     after Cantera 2.2.
  */
 doublereal isDuplicateReaction(std::map<int, doublereal>& r1,
                                std::map<int, doublereal>& r2);
@@ -60,6 +57,8 @@ doublereal isDuplicateReaction(std::map<int, doublereal>& r1,
  *   @param errorTolerance double containing the error tolerance.
  *
  * @ingroup kineticsmgr
+ * @deprecated Now handled by Kinetics::checkReactionBalance. To be removed
+ *     after Cantera 2.2.
  */
 void checkRxnElementBalance(Kinetics& kin,
                             const ReactionData& rdata,
@@ -86,9 +85,10 @@ void checkRxnElementBalance(Kinetics& kin,
  *                  a species we simply return false, allowing the calling
  *                  routine to skip this reaction and continue. Otherwise, we
  *                  will throw an error.
+ * @deprecated Now handled through newReaction() and its support functions. To
+ *     be removed after Cantera 2.2.
  */
-bool getReagents(const XML_Node& rxn, Kinetics& kin, int rp,
-                 std::string default_phase,
+bool getReagents(const XML_Node& rxn, Kinetics& kin, int rp, std::string default_phase,
                  std::vector<size_t>& spnum, vector_fp& stoich,
                  vector_fp& order, const ReactionRules& rules);
 
@@ -105,6 +105,9 @@ bool getReagents(const XML_Node& rxn, Kinetics& kin, int rp,
  *  @param rules   Rules for parsing and installing reactions
  *
  *   Trigger an exception for negative A unless specifically authorized.
+ *
+ * @deprecated Now handled through newReaction() and its support functions. To
+ *     be removed after Cantera 2.2.
  *
  * @ingroup kineticsmgr
  */
@@ -163,18 +166,18 @@ bool installReactionArrays(const XML_Node& p, Kinetics& kin,
  *
  * @param kin   This is a pointer to a kinetics manager class that will be
  *              initialized with the kinetics mechanism. Inherited Kinetics
- *              classes may be used here.
+ *              classes should be used here.
  *
  * @ingroup kineticsmgr
- *
  */
 bool importKinetics(const XML_Node& phase, std::vector<ThermoPhase*> th,
                     Kinetics* kin);
 
-//!Build a single-phase ThermoPhase object with associated kinetics mechanism.
+//! Build a single-phase ThermoPhase object with associated kinetics mechanism.
 /*!
  *  In a single call, this routine initializes a ThermoPhase object and a
- *  homogeneous kinetics object for a phase.
+ *  homogeneous kinetics object for a phase. It returns the fully initialized
+ *  ThermoPhase object ptr and kinetics ptr.
  *
  * @param root pointer to the XML tree which will be searched to find the
  *             XML phase element.
@@ -183,7 +186,7 @@ bool importKinetics(const XML_Node& phase, std::vector<ThermoPhase*> th,
  * @param nm   Name of the XML element. Should be "phase"
  * @param th   Pointer to a bare ThermoPhase object, which will be initialized
  *             by this operation.
- * @param k    Pointer to a bare Kinetics object, which will be initialized
+ * @param kin  Pointer to a bare Kinetics object, which will be initialized
  *             by this operation to a homogeneous kinetics manager
  *
  * @return
@@ -192,36 +195,17 @@ bool importKinetics(const XML_Node& phase, std::vector<ThermoPhase*> th,
  * For Example
  *
  * @code
- *        ThermoPhase *th = new ThermoPhase();
- *        Kinetics    *k  = new Kinetics();
+ *        ThermoPhase *th   = new ThermoPhase();
+ *        Kinetics    *kin  = new Kinetics();
  *        XML_Node *root = get_XML_File("gri30.xml");
- *        ok =  buildSolutionFromXML(root, "gri30_mix", "phase", th, k)
+ *        ok =  buildSolutionFromXML(root, "gri30_mix", "phase", th, kin)
  * @endcode
  *
  * @ingroup inputfiles
  * @see importKinetics()
  */
 bool buildSolutionFromXML(XML_Node& root, const std::string& id,
-                          const std::string& nm, ThermoPhase* th, Kinetics* k);
-
-//! Search an XML tree for species data.
-/*!
- *   This utility routine will search the XML tree for the species named by
- *   the string, kname. It will return the XML_Node pointer. Failures of any
- *   kind return the null pointer.
- *
- * @param kname species Name
- * @param phaseSpeciesData Pointer to the phase XML node pertaining to the
- *                         species database for the phase to be found
- *
- * @return
- *    Returns a pointer to the XML node containing the species data.
- *
- * @ingroup inputfiles
- */
-//const XML_Node *speciesXML_Node(std::string kname,
-//                                const XML_Node *phaseSpeciesData);
-
+                          const std::string& nm, ThermoPhase* th, Kinetics* kin);
 }
 
 #endif

@@ -112,29 +112,6 @@ public:
         mu[0] = gibbs_mole();
     }
 
-    //!  Get the species electrochemical potentials.
-    /*!
-     *  These are partial molar quantities.  This method adds a term \f$ F z_k
-     *  \phi_p \f$ to each chemical potential.
-     *  The electrochemical potential of species k in a phase p, \f$ \zeta_k \f$,
-     *  is related to the chemical potential via
-     *  the following equation,
-     *
-     *       \f[
-     *            \zeta_{k}(T,P) = \mu_{k}(T,P) + F z_k \phi_p
-     *       \f]
-     *
-     * @param mu  Output vector of species electrochemical
-     *            potentials. Length: m_kk. Units: J/kmol
-     */
-    void getElectrochemPotentials(doublereal* mu) const {
-        getChemPotentials(mu);
-        double ve = Faraday * electricPotential();
-        for (size_t k = 0; k < m_kk; k++) {
-            mu[k] += ve*charge(k);
-        }
-    }
-
     //! Returns an array of partial molar enthalpies for the species
     //! in the mixture. Units (J/kmol)
     /*!
@@ -175,24 +152,6 @@ public:
      *                Length = m_kk. units are m^3/kmol.
      */
     virtual void getPartialMolarVolumes(doublereal* vbar) const;
-
-    //! This method returns the convention used in specification
-    //! of the standard state, of which there are currently two,
-    //! temperature based, and variable pressure based.
-    /*!
-     * Currently, there are two standard state conventions:
-     *  - Temperature-based activities
-     *   cSS_CONVENTION_TEMPERATURE 0
-     *      - default
-     *
-     *  -  Variable Pressure and Temperature -based activities
-     *   cSS_CONVENTION_VPSS 1
-     *
-     *  -  Thermodynamics is set via slave ThermoPhase objects with
-     *     nothing being carried out at this %ThermoPhase object level
-     *   cSS_CONVENTION_SLAVE 2
-     */
-    virtual int standardStateConvention() const;
 
     //! This method returns an array of generalized concentrations
     /*!
@@ -476,16 +435,13 @@ public:
      * description, this method is called from ThermoPhase::initThermoXML(),
      * which is called from importPhase(),
      * just prior to returning from function importPhase().
-     *
-     * @see importCTML.cpp
      */
     virtual void initThermo();
 
     //! Set equation of state parameter values from XML entries.
     /*!
-     * This method is called by function importPhase() in
-     * file importCTML.cpp when processing a phase definition in
-     * an input file. It should be overloaded in subclasses to set
+     * This method is called by function importPhase() when processing a phase
+     * definition in an input file. It should be overloaded in subclasses to set
      * any parameters that are specific to that particular phase
      * model. Note, this method is called before the phase is
      * initialized with elements and/or species.
@@ -499,8 +455,10 @@ public:
     /*!
      * @param show_thermo If true, extra information is printed out
      *                    about the thermodynamic state of the system.
+     * @param threshold   Unused in this subclass
      */
-    virtual std::string report(bool show_thermo = true) const;
+    virtual std::string report(bool show_thermo=true,
+                               doublereal threshold=1e-14) const;
 
 protected:
 

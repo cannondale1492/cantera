@@ -3,13 +3,12 @@
  * Definitions for the \link Cantera::MultiPhase MultiPhase\endlink
  * object that is used to set up multiphase equilibrium problems (see \ref equilfunctions).
  */
+
+#include "cantera/equil/ChemEquil.h"
 #include "cantera/equil/MultiPhase.h"
 #include "cantera/equil/MultiPhaseEquil.h"
-
-#include "cantera/thermo/ThermoPhase.h"
-#include "cantera/numerics/DenseMatrix.h"
+#include "cantera/equil/vcs_MultiPhaseEquil.h"
 #include "cantera/base/stringUtils.h"
-#include "cantera/base/global.h"
 
 using namespace std;
 
@@ -74,8 +73,7 @@ MultiPhase& MultiPhase::operator=(const MultiPhase& right)
     return *this;
 }
 
-void MultiPhase::
-addPhases(MultiPhase& mix)
+void MultiPhase::addPhases(MultiPhase& mix)
 {
     size_t n;
     for (n = 0; n < mix.m_np; n++) {
@@ -83,8 +81,8 @@ addPhases(MultiPhase& mix)
     }
 }
 
-void MultiPhase::
-addPhases(std::vector<ThermoPhase*>& phases, const vector_fp& phaseMoles)
+void MultiPhase::addPhases(std::vector<ThermoPhase*>& phases,
+                           const vector_fp& phaseMoles)
 {
     size_t np = phases.size();
     size_t n;
@@ -94,8 +92,7 @@ addPhases(std::vector<ThermoPhase*>& phases, const vector_fp& phaseMoles)
     init();
 }
 
-void MultiPhase::
-addPhase(ThermoPhase* p, doublereal moles)
+void MultiPhase::addPhase(ThermoPhase* p, doublereal moles)
 {
     if (m_init) {
         throw CanteraError("addPhase",
@@ -159,14 +156,8 @@ addPhase(ThermoPhase* p, doublereal moles)
     // water, only one of which should be present if the mixture
     // represents an equilibrium state.
     if (p->nSpecies() > 1) {
-        double t = p->minTemp();
-        if (t > m_Tmin) {
-            m_Tmin = t;
-        }
-        t = p->maxTemp();
-        if (t < m_Tmax) {
-            m_Tmax = t;
-        }
+        m_Tmin = std::max(p->minTemp(), m_Tmin);
+        m_Tmax = std::min(p->maxTemp(), m_Tmax);
     }
 }
 
@@ -220,7 +211,6 @@ void MultiPhase::init()
                     esum += m_atoms(m,k) * m_atomicNumber[m];
                 }
             }
-            //m_atoms(m_eloc, k) += esum;
         }
     }
 
@@ -435,16 +425,12 @@ void MultiPhase::setPhaseMoleFractions(const size_t n, const doublereal* const x
     }
 }
 
-void MultiPhase::setMolesByName(compositionMap& xMap)
+void MultiPhase::setMolesByName(const compositionMap& xMap)
 {
     size_t kk = nSpecies();
-    doublereal x;
     vector_fp moles(kk, 0.0);
     for (size_t k = 0; k < kk; k++) {
-        x = xMap[speciesName(k)];
-        if (x > 0.0) {
-            moles[k] = x;
-        }
+        moles[k] = std::max(getValue(xMap, speciesName(k), 0.0), 0.0);
     }
     setMoles(DATA_PTR(moles));
 }
@@ -510,9 +496,7 @@ void MultiPhase::addSpeciesMoles(const int indexS, const doublereal addedMoles)
     vector_fp tmpMoles(m_nsp, 0.0);
     getMoles(DATA_PTR(tmpMoles));
     tmpMoles[indexS] += addedMoles;
-    if (tmpMoles[indexS] < 0.0) {
-        tmpMoles[indexS] = 0.0;
-    }
+    tmpMoles[indexS] = std::max(tmpMoles[indexS], 0.0);
     setMoles(DATA_PTR(tmpMoles));
 }
 
@@ -578,36 +562,42 @@ doublereal MultiPhase::volume() const
     return sum;
 }
 
-doublereal MultiPhase::equilibrate(int XY, doublereal err,
-                                   int maxsteps, int maxiter, int loglevel)
+double MultiPhase::equilibrate(int XY, doublereal err, int maxsteps,
+                               int maxiter, int loglevel)
+{
+    warn_deprecated("MultiPhase::equilibrate(int XY, ...)",
+        "Use MultiPhase::equilibrate(string XY, ...) instead. To be removed "
+        "after Cantera 2.2.");
+    return equilibrate_MultiPhaseEquil(XY, err, maxsteps, maxiter, loglevel);
+}
+
+double MultiPhase::equilibrate_MultiPhaseEquil(int XY, doublereal err,
+                                               int maxsteps, int maxiter,
+                                               int loglevel)
 {
     bool strt = false;
     doublereal dt;
     doublereal h0;
     int n;
     doublereal hnow, herr = 1.0;
-    doublereal snow, serr = 1.0, s0;
+    doublereal snow, s0;
     doublereal Tlow = -1.0, Thigh = -1.0;
     doublereal Hlow = Undef, Hhigh = Undef, tnew;
     doublereal dta=0.0, dtmax, cpb;
-    MultiPhaseEquil* e = 0;
-
     if (!m_init) {
         init();
     }
 
     if (XY == TP) {
         // create an equilibrium manager
-        e = new MultiPhaseEquil(this);
+        MultiPhaseEquil e(this);
         try {
-            e->equilibrate(XY, err, maxsteps, loglevel);
+            e.equilibrate(XY, err, maxsteps, loglevel);
         } catch (CanteraError& err) {
             err.save();
-            delete e;
-            e = 0;
             throw err;
         }
-        goto done;
+        return err;
     }
 
     else if (XY == HP) {
@@ -618,16 +608,12 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
 
             // if 'strt' is false, the current composition will be used as
             // the starting estimate; otherwise it will be estimated
-            //                if (e) {
-            //    cout << "e should be zero, but it is not!" << endl;
-            //    delete e;
-            // }
-            e = new MultiPhaseEquil(this, strt);
+            MultiPhaseEquil e(this, strt);
             // start with a loose error tolerance, but tighten it as we get
             // close to the final temperature
 
             try {
-                e->equilibrate(TP, err, maxsteps, loglevel);
+                e.equilibrate(TP, err, maxsteps, loglevel);
                 hnow = enthalpy();
                 // the equilibrium enthalpy monotonically increases with T;
                 // if the current value is below the target, the we know the
@@ -657,19 +643,17 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
                 } else {
                     tnew = sqrt(Tlow*Thigh);
                     dt = tnew - m_temp;
-                    //cpb = cp();
                 }
 
                 herr = fabs((h0 - hnow)/h0);
 
-                if (herr < err) { // || dta < 1.0e-4) {
-                    goto done;
+                if (herr < err) {
+                    return err;
                 }
                 tnew = m_temp + dt;
                 if (tnew < 0.0) {
                     tnew = 0.5*m_temp;
                 }
-                //dta = fabs(tnew - m_temp);
                 setTemperature(tnew);
 
                 // if the size of Delta T is not too large, use
@@ -692,32 +676,24 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
                     setTemperature(tnew);
                 }
             }
-            delete e;
-            e = 0;
         }
-        throw CanteraError("MultiPhase::equilibrate",
+        throw CanteraError("MultiPhase::equilibrate_MultiPhaseEquil",
                            "No convergence for T");
     } else if (XY == SP) {
         s0 = entropy();
-        Tlow = 1.0; // m_Tmin;      // lower bound on T
-        Thigh = 1.0e6; // m_Tmax;   // upper bound on T
+        Tlow = 1.0;    // lower bound on T
+        Thigh = 1.0e6; // upper bound on T
         for (n = 0; n < maxiter; n++) {
-            delete e;
-            e = new MultiPhaseEquil(this, strt);
+            MultiPhaseEquil e(this, strt);
 
             try {
-                e->equilibrate(TP, err, maxsteps, loglevel);
+                e.equilibrate(TP, err, maxsteps, loglevel);
                 snow = entropy();
                 if (snow < s0) {
-                    if (m_temp > Tlow) {
-                        Tlow = m_temp;
-                    }
+                    Tlow = std::max(Tlow, m_temp);
                 } else {
-                    if (m_temp < Thigh) {
-                        Thigh = m_temp;
-                    }
+                    Thigh = std::min(Thigh, m_temp);
                 }
-                serr = fabs((s0 - snow)/s0);
                 dt = (s0 - snow)*m_temp/cp();
                 dtmax = 0.5*fabs(Thigh - Tlow);
                 dtmax = (dtmax > 500.0 ? 500.0 : dtmax);
@@ -726,7 +702,7 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
                     dt *= dtmax/dta;
                 }
                 if (herr < err || dta < 1.0e-4) {
-                    goto done;
+                    return err;
                 }
                 tnew = m_temp + dt;
                 setTemperature(tnew);
@@ -747,13 +723,10 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
                     setTemperature(tnew);
                 }
             }
-            delete e;
-            e = 0;
         }
-        throw CanteraError("MultiPhase::equilibrate",
+        throw CanteraError("MultiPhase::equilibrate_MultiPhaseEquil",
                            "No convergence for T");
     } else if (XY == TV) {
-        //            doublereal dt = 1.0e3;
         doublereal v0 = volume();
         doublereal dVdP;
         int n;
@@ -769,7 +742,7 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
             verr = fabs((v0 - vnow)/v0);
 
             if (verr < err) {
-                goto done;
+                return err;
             }
             // find dV/dP
             setPressure(pnow*1.01);
@@ -779,13 +752,75 @@ doublereal MultiPhase::equilibrate(int XY, doublereal err,
     }
 
     else {
-        throw CanteraError("MultiPhase::equilibrate","unknown option");
+        throw CanteraError("MultiPhase::equilibrate_MultiPhaseEquil",
+                           "unknown option");
     }
     return -1.0;
-done:
-    delete e;
-    e = 0;
-    return err;
+}
+
+void MultiPhase::equilibrate(const std::string& XY, const std::string& solver,
+                             double rtol, int max_steps, int max_iter,
+                             int estimate_equil, int log_level)
+{
+    // Save the initial state so that it can be restored in case one of the
+    // solvers fails
+    vector_fp initial_moleFractions = m_moleFractions;
+    vector_fp initial_moles = m_moles;
+    double initial_T = m_temp;
+    double initial_P = m_press;
+
+    int ixy = _equilflag(XY.c_str());
+    if (solver == "auto" || solver == "vcs") {
+        try {
+            writelog("Trying VCS equilibrium solver\n", log_level);
+            VCSnonideal::vcs_MultiPhaseEquil eqsolve(this, log_level-1);
+            int ret = eqsolve.equilibrate(ixy, estimate_equil, log_level-1,
+                                          rtol, max_steps);
+            if (ret) {
+                throw CanteraError("MultiPhase::equilibrate",
+                    "VCS solver failed. Return code: " + int2str(ret));
+            }
+            writelog("VCS solver succeeded\n", log_level);
+            return;
+        } catch (std::exception& err) {
+            writelog("VCS solver failed.\n", log_level);
+            writelog(err.what(), log_level);
+            m_moleFractions = initial_moleFractions;
+            m_moles = initial_moles;
+            m_temp = initial_T;
+            m_press = initial_P;
+            updatePhases();
+            if (solver == "auto") {
+            } else {
+                throw;
+            }
+        }
+    }
+
+    if (solver == "auto" || solver == "gibbs") {
+        try {
+            writelog("Trying MultiPhaseEquil (Gibbs) equilibrium solver\n",
+                     log_level);
+            equilibrate_MultiPhaseEquil(ixy, rtol, max_steps, max_iter,
+                                        log_level-1);
+            writelog("MultiPhaseEquil solver succeeded\n", log_level);
+            return;
+        } catch (std::exception& err) {
+            writelog("MultiPhaseEquil solver failed.\n", log_level);
+            writelog(err.what(), log_level);
+            m_moleFractions = initial_moleFractions;
+            m_moles = initial_moles;
+            m_temp = initial_T;
+            m_press = initial_P;
+            updatePhases();
+            throw;
+        }
+    }
+
+    if (solver != "auto") {
+        throw CanteraError("MultiPhase::equilibrate",
+            "Invalid solver specified: '" + solver + "'");
+    }
 }
 
 #ifdef MULTIPHASE_DEVEL
@@ -799,8 +834,7 @@ void importFromXML(string infile, string id)
     if (x.name() != "multiphase")
         throw CanteraError("MultiPhase::importFromXML",
                            "Current XML_Node is not a multiphase element.");
-    vector<XML_Node*> phases;
-    x.getChildren("phase",phases);
+    vector<XML_Node*> phases = x.getChildren("phase");
     int np = phases.size();
     int n;
     ThermoPhase* p;

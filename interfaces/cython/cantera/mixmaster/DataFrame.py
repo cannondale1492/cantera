@@ -8,7 +8,7 @@ else:
     from tkFileDialog import askopenfilename
 
 from cantera import *
-import numpy as num
+import numpy as np
 from .GraphFrame import Graph
 from .DataGraph import DataGraph, plotLimits
 from .ControlPanel import make_menu
@@ -125,11 +125,8 @@ class DataFrame(Frame):
         if self.plt:
             self.plt.destroy()
 
-        f = open(self.datafile.get(),'r')
-        lines = f.readlines()
-        vars = string.split(lines[0],',')
-        nlines = len(lines)
-        self.np = nlines - 1
+        with open(self.datafile.get(),'r') as f:
+            vars = f.readline().split(',')
         nv = len(vars)
         vv = []
         for n in range(nv):
@@ -140,25 +137,18 @@ class DataFrame(Frame):
                 break
         nv = len(vv)
         vars = vv
-        fdata = zeros((nv, self.np),'d')
-        for n in range(self.np):
-            v = string.split(lines[n+1],',')
-            for j in range(nv):
-                try:
-                    fdata[j,n] = float(v[j])
-                except:
-                    fdata[j,n] = 0.0
-
-        self.nsp = self.g.nSpecies()
-        self.y = zeros(self.nsp,'d')
-        self.data = zeros((self.nsp+6,self.np),'d')
+        fdata = np.genfromtxt(self.datafile.get(), dtype=float, delimiter=',',
+                              skip_header=1).transpose()
+        self.nsp = self.g.n_species
+        self.y = np.zeros(self.nsp,'d')
+        self.data = np.zeros((self.nsp+6,fdata.shape[1]),'d')
         self.data[0,:] = fdata[0,:]
         self.label = ['-']*(self.nsp+6)
         self.label[0] = vars[0]
         w = []
         for n in range(1,nv-1):
             try:
-                k = self.g.speciesIndex(vars[n])
+                k = self.g.species_index(vars[n])
             except:
                 k = -1
             v2 = vars[n]
@@ -184,10 +174,10 @@ class DataFrame(Frame):
                 w.append((vars[n], self.newplot, 'check', self.loc, k + Y_LOC))
 
         if self.data[P_LOC,0] == 0.0:
-            self.data[P_LOC,:] = ones(self.np,'d')*OneAtm
+            self.data[P_LOC,:] = np.ones(fdata.shape[1],'d')*one_atm
             print('Warning: no pressure data. P set to 1 atm.')
 
-        self.sc.config(cnf={'from':0,'to':self.np-1})
+        self.sc.config(cnf={'from':0,'to':fdata.shape[1]-1})
         if self.loc.get() <= 0:
             self.loc.set(self.lastloc)
         self.updateplot()
@@ -214,10 +204,10 @@ class DataFrame(Frame):
         if self.plt:
             self.plt.destroy()
 
-        self.nsp = self.g.nSpecies()
+        self.nsp = self.g.n_species
         self.label = ['-']*(self.nsp + 6)
 
-        self.y = zeros(self.nsp,'d')
+        self.y = np.zeros(self.nsp,'d')
         gdata = self.soln.child('flowfield/grid_data')
         xp = self.soln.child('flowfield').children('float')
         p = 0.0
@@ -225,14 +215,14 @@ class DataFrame(Frame):
             if x['title'] == 'pressure':
                 p = float(x.value())
         fa = gdata.children('floatArray')
-        self.np = int(fa[0]['size'])
+        data_size = int(fa[0]['size'])
 
-        self.data = zeros((self.nsp+6,self.np),'d')
+        self.data = np.zeros((self.nsp+6,data_size),'d')
         w = []
         for f in fa:
             t = f['title']
             try:
-                k = self.g.speciesIndex(t)
+                k = self.g.species_index(t)
             except:
                 k = -1
             v = XML.getFloatArray(f)
@@ -256,9 +246,9 @@ class DataFrame(Frame):
                 self.label[V_LOC] = t
                 w.append((t, self.newplot, 'check', self.loc, V_LOC))
 
-        self.data[P_LOC,:] = ones(self.np,'d')*p
+        self.data[P_LOC,:] = np.ones(data_size,'d')*p
         self.label[P_LOC] = 'P (Pa)'
-        self.sc.config(cnf={'from':0,'to':self.np-1})
+        self.sc.config(cnf={'from':0,'to':data_size-1})
         if self.loc.get() <= 0:
             self.loc.set(self.lastloc)
         self.updateplot()
@@ -301,7 +291,7 @@ class DataFrame(Frame):
                 if self.ydata[n] <= 0.0:
                     #print n, self.ydata[n]
                     self.ydata[n] = 1.0e-20
-            self.ydata = num.log10(self.ydata)
+            self.ydata = np.log10(self.ydata)
             ylog = 1
 
         self.gdata = []

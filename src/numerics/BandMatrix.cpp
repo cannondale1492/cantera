@@ -9,9 +9,7 @@
 #include "cantera/numerics/BandMatrix.h"
 #include "cantera/numerics/ctlapack.h"
 #include "cantera/base/utilities.h"
-#include "cantera/base/ctexceptions.h"
 #include "cantera/base/stringUtils.h"
-#include "cantera/base/global.h"
 
 #include <cstring>
 #include <fstream>
@@ -23,7 +21,6 @@ namespace Cantera
 
 BandMatrix::BandMatrix() :
     GeneralMatrix(1),
-    m_factored(false),
     m_n(0),
     m_kl(0),
     m_ku(0),
@@ -35,7 +32,6 @@ BandMatrix::BandMatrix() :
 
 BandMatrix::BandMatrix(size_t n, size_t kl, size_t ku, doublereal v)   :
     GeneralMatrix(1),
-    m_factored(false),
     m_n(n),
     m_kl(kl),
     m_ku(ku),
@@ -54,8 +50,7 @@ BandMatrix::BandMatrix(size_t n, size_t kl, size_t ku, doublereal v)   :
 }
 
 BandMatrix::BandMatrix(const BandMatrix& y) :
-    GeneralMatrix(1),
-    m_factored(false),
+    GeneralMatrix(y),
     m_n(0),
     m_kl(0),
     m_ku(0),
@@ -66,7 +61,6 @@ BandMatrix::BandMatrix(const BandMatrix& y) :
     m_ku = y.m_ku;
     data = y.data;
     ludata = y.ludata;
-    m_factored = y.m_factored;
     m_ipiv = y.m_ipiv;
     m_colPtrs.resize(m_n);
     size_t ldab = (2 *m_kl + m_ku + 1);
@@ -87,7 +81,6 @@ BandMatrix& BandMatrix::operator=(const BandMatrix& y)
     m_ipiv = y.m_ipiv;
     data = y.data;
     ludata = y.ludata;
-    m_factored = y.m_factored;
     m_colPtrs.resize(m_n);
     size_t ldab = (2 * m_kl + m_ku + 1);
     for (size_t j = 0; j < m_n; j++) {
@@ -270,16 +263,19 @@ int BandMatrix::solve(const doublereal* const b, doublereal* const x)
     return solve(x);
 }
 
-int BandMatrix::solve(doublereal* b)
+int BandMatrix::solve(doublereal* b, size_t nrhs, size_t ldb)
 {
     int info = 0;
     if (!m_factored) {
         info = factor();
     }
+    if (ldb == 0) {
+        ldb = nColumns();
+    }
     if (info == 0)
         ct_dgbtrs(ctlapack::NoTranspose, nColumns(), nSubDiagonals(),
-                  nSuperDiagonals(), 1, DATA_PTR(ludata), ldim(),
-                  DATA_PTR(ipiv()), b, nColumns(), info);
+                  nSuperDiagonals(), nrhs, DATA_PTR(ludata), ldim(),
+                  DATA_PTR(ipiv()), b, ldb, info);
 
     // error handling
     if (info != 0) {
@@ -325,23 +321,6 @@ ostream& operator<<(ostream& s, const BandMatrix& m)
     return s;
 }
 
-void BandMatrix::err(const std::string& msg) const
-{
-    throw CanteraError("BandMatrix() unimplemented function", msg);
-}
-
-int  BandMatrix::factorQR()
-{
-    factor();
-    return 0;
-}
-
-doublereal  BandMatrix::rcondQR()
-{
-    double a1norm = oneNorm();
-    return rcond(a1norm);
-}
-
 doublereal  BandMatrix::rcond(doublereal a1norm)
 {
     int printLevel = 0;
@@ -357,7 +336,6 @@ doublereal  BandMatrix::rcond(doublereal a1norm)
         throw CanteraError("BandMatrix::rcond()", "matrix isn't factored correctly");
     }
 
-    // doublereal anorm = oneNorm();
     size_t ldab = (2 *m_kl + m_ku + 1);
     int rinfo = 0;
     rcond = ct_dgbcon('1', m_n, m_kl, m_ku, DATA_PTR(ludata), ldab, DATA_PTR(m_ipiv), a1norm, DATA_PTR(work_),
@@ -371,11 +349,6 @@ doublereal  BandMatrix::rcond(doublereal a1norm)
         }
     }
     return rcond;
-}
-
-void BandMatrix::useFactorAlgorithm(int fAlgorithm)
-{
-    // QR algorithm isn't implemented for banded matrix.
 }
 
 int BandMatrix::factorAlgorithm() const
@@ -394,9 +367,7 @@ doublereal BandMatrix::oneNorm() const
         for (int i = j - ku; i <= j + kl; i++) {
             sum += fabs(colP[kl + ku + i - j]);
         }
-        if (sum > value) {
-            value = sum;
-        }
+        value = std::max(sum, value);
     }
     return value;
 }
@@ -405,15 +376,11 @@ size_t BandMatrix::checkRows(doublereal& valueSmall) const
 {
     valueSmall = 1.0E300;
     size_t iSmall = npos;
-    double vv;
     for (int i = 0; i < (int) m_n; i++) {
         double valueS = 0.0;
         for (int j = i - (int) m_kl; j <= i + (int) m_ku; j++) {
             if (j >= 0 && j < (int) m_n) {
-                vv = fabs(value(i,j));
-                if (vv > valueS) {
-                    valueS = vv;
-                }
+                valueS = std::max(fabs(value(i,j)), valueS);
             }
         }
         if (valueS < valueSmall) {
@@ -431,15 +398,11 @@ size_t BandMatrix::checkColumns(doublereal& valueSmall) const
 {
     valueSmall = 1.0E300;
     size_t jSmall = npos;
-    double vv;
     for (int j = 0; j < (int) m_n; j++) {
         double valueS = 0.0;
         for (int i = j - (int) m_ku; i <= j + (int) m_kl; i++) {
             if (i >= 0 && i < (int) m_n) {
-                vv = fabs(value(i,j));
-                if (vv > valueS) {
-                    valueS = vv;
-                }
+                valueS = std::max(fabs(value(i,j)), valueS);
             }
         }
         if (valueS < valueSmall) {
@@ -458,11 +421,6 @@ GeneralMatrix* BandMatrix::duplMyselfAsGeneralMatrix() const
     return new BandMatrix(*this);
 }
 
-bool BandMatrix::factored() const
-{
-    return m_factored;
-}
-
 doublereal* BandMatrix::ptrColumn(size_t j)
 {
     return m_colPtrs[j];
@@ -475,15 +433,17 @@ doublereal* const* BandMatrix::colPts()
 
 void BandMatrix::copyData(const GeneralMatrix& y)
 {
+    warn_deprecated("BandMatrix::copyData", "To be removed after Cantera 2.2.");
     m_factored = false;
     size_t n = sizeof(doublereal) * m_n * (2 *m_kl + m_ku + 1);
     GeneralMatrix* yyPtr = const_cast<GeneralMatrix*>(&y);
     (void) memcpy(DATA_PTR(data), yyPtr->ptrColumn(0), n);
 }
 
-void BandMatrix::clearFactorFlag()
+void BandMatrix::useFactorAlgorithm(int fAlgorithm)
 {
-    m_factored = 0;
+//    useQR_ = fAlgorithm;
 }
+
 
 }

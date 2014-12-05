@@ -17,7 +17,9 @@
 #include "cantera/thermo/VPSSMgr_Water_HKFT.h"
 #include "cantera/thermo/PDSS_Water.h"
 #include "cantera/thermo/PDSS_HKFT.h"
+#include "cantera/thermo/VPStandardStateTP.h"
 #include "cantera/thermo/GeneralSpeciesThermo.h"
+#include "cantera/base/xml.h"
 
 using namespace std;
 
@@ -52,7 +54,7 @@ VPSSMgr_Water_HKFT::operator=(const VPSSMgr_Water_HKFT& b)
         return *this;
     }
     VPSSMgr::operator=(b);
-    m_waterSS = (PDSS_Water*) m_vptp_ptr->providePDSS(0);
+    m_waterSS = dynamic_cast<PDSS_Water*>(m_vptp_ptr->providePDSS(0));
     m_tlastRef = -1.0;
     return *this;
 }
@@ -154,9 +156,9 @@ void VPSSMgr_Water_HKFT::_updateRefStateThermo() const
     m_cp0_R[0] = (m_waterSS->cp_mole()) / GasConstant;
     m_g0_RT[0] = (m_hss_RT[0] - m_sss_R[0]);
     m_V0[0]    = (m_waterSS->density()) / m_vptp_ptr->molecularWeight(0);
-    PDSS_HKFT* ps;
+    PDSS* ps;
     for (size_t k = 1; k < m_kk; k++) {
-        ps = (PDSS_HKFT*) m_vptp_ptr->providePDSS(k);
+        ps = m_vptp_ptr->providePDSS(k);
         ps->setState_TP(m_tlast, m_p0);
         m_cp0_R[k]  = ps->cp_R();
         m_s0_R[k]   = ps->entropy_mole() / GasConstant;
@@ -173,7 +175,7 @@ void VPSSMgr_Water_HKFT::_updateRefStateThermo() const
     }
     m_waterSS->setState_TP(m_tlast, m_plast);
     for (size_t k = 1; k < m_kk; k++) {
-        ps = (PDSS_HKFT*) m_vptp_ptr->providePDSS(k);
+        ps = m_vptp_ptr->providePDSS(k);
         ps->setState_TP(m_tlast, m_plast);
     }
 }
@@ -190,7 +192,7 @@ void VPSSMgr_Water_HKFT::_updateStandardStateThermo()
     m_Vss[0]    = (m_vptp_ptr->molecularWeight(0)) / (m_waterSS->density());
 
     for (size_t k = 1; k < m_kk; k++) {
-        PDSS_HKFT* ps = (PDSS_HKFT*) m_vptp_ptr->providePDSS(k);
+        PDSS* ps = m_vptp_ptr->providePDSS(k);
         ps->setState_TP(m_tlast, m_plast);
         m_cpss_R[k]  = ps->cp_R();
         m_sss_R[k]   = ps->entropy_R();
@@ -230,7 +232,7 @@ VPSSMgr_Water_HKFT::initThermoXML(XML_Node& phaseNode, const std::string& id)
             throw CanteraError("VPSSMgr_Water_HKFT::initThermoXML",
                                "No standardState Node for species " + sss[k]);
         }
-        std::string model = lowercase((*ss)["model"]);
+        std::string model = lowercase(ss->attrib("model"));
         if (model != "hkft") {
             throw CanteraError("VPSSMgr_Water_HKFT::initThermoXML",
                                "Standard state model for a solute species isn't "
@@ -261,7 +263,7 @@ VPSSMgr_Water_HKFT::createInstallPDSS(size_t k, const XML_Node& speciesNode,
                                "h2o wrong name: " + xn);
         }
 
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "waterIAPWS" && model != "waterPDSS") {
             throw CanteraError("VPSSMgr_Water_HKFT::installSpecies",
                                "wrong SS mode: " + model);
@@ -279,7 +281,7 @@ VPSSMgr_Water_HKFT::createInstallPDSS(size_t k, const XML_Node& speciesNode,
 
         kPDSS = m_waterSS;
     } else {
-        std::string model = (*ss)["model"];
+        std::string model = ss->attrib("model");
         if (model != "HKFT") {
             std::string sName = speciesNode["name"];
             throw CanteraError("VPSSMgr_Water_HKFT::initThermoXML",

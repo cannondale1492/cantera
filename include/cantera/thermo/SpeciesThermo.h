@@ -161,22 +161,6 @@ public:
     //! Destructor
     virtual ~SpeciesThermo() {}
 
-    //! Copy Constructor for the %SpeciesThermo object.
-    /*!
-     * @param right    Reference to %SpeciesThermo object to be copied into the
-     *                 current one.
-     */
-    SpeciesThermo(const SpeciesThermo& right) {}
-
-    //! Assignment operator for the %SpeciesThermo object
-    /*!
-     * @param right    Reference to %SpeciesThermo object to be copied into the
-     *                 current one.
-     */
-    SpeciesThermo& operator=(const SpeciesThermo& right) {
-        return *this;
-    }
-
     //! Duplication routine for objects derived from SpeciesThermo
     /*!
      *  This function can be used to duplicate objects derived from
@@ -317,7 +301,7 @@ public:
      *   @param k    species index
      *   @return     Returns the current value of the Heat of Formation at 298K and 1 bar
      */
-    virtual doublereal reportOneHf298(int k) const = 0;
+    virtual doublereal reportOneHf298(const size_t k) const = 0;
 
     //!  Modify the value of the 298 K Heat of Formation of the standard state of
     //!  one species in the phase (J kmol-1)
@@ -329,8 +313,17 @@ public:
      *   @param  Hf298New    Specify the new value of the Heat of Formation at 298K and 1 bar.
      *                       units = J/kmol.
      */
-    virtual void modifyOneHf298(const int k, const doublereal Hf298New) = 0;
+    virtual void modifyOneHf298(const size_t k, const doublereal Hf298New) = 0;
 
+    //! Check if data for all species (0 through nSpecies-1) has been installed.
+    bool ready(size_t nSpecies);
+
+protected:
+    //! Mark species *k* as having its thermodynamic data installed
+    void markInstalled(size_t k);
+
+private:
+    std::vector<bool> m_installed; // indicates if data for species has been installed
 };
 //@}
 }

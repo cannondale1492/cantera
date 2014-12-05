@@ -217,9 +217,7 @@ int main(int argc, char** argv)
         }
 
         /************************************************************/
-        XML_Node* xc = new XML_Node();
-        string path = findInputFile(infile);
-        ctml::get_CTML_Tree(xc, path);
+        XML_Node* xc = get_XML_File(infile);
 
         XML_Node* const xg = (XML_Node*) findXMLPhase(xc, gasPhaseName);
         if (!xg) {
@@ -369,11 +367,7 @@ int main(int argc, char** argv)
          */
         double pres = gasTP->pressure();
         gasTP->getMoleFractions(x);
-        double tmp = 0.3 * x[0];
-        double tmp2 = 0.3 * x[1];
-        if (tmp2 < tmp) {
-            tmp = tmp2;
-        }
+        double tmp = 0.3 * std::min(x[0], x[1]);
         x[0] += tmp;
         x[1] -= tmp;
         gasTP->setState_PX(pres, x);
@@ -440,10 +434,10 @@ int main(int argc, char** argv)
         bulkPhaseTP = 0;
         delete surfPhaseTP;
         surfPhaseTP = 0;
-        delete xc;
         appdelete();
     } catch (CanteraError& err) {
         std::cout << err.what() << std::endl;
+        return 1;
     }
 
     return 0;

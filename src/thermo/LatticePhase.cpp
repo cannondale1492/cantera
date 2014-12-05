@@ -7,13 +7,11 @@
  *  (see \ref thermoprops and class \link Cantera::LatticePhase LatticePhase\endlink).
  *
  */
-#include "cantera/base/config.h"
-#include "cantera/base/ct_defs.h"
-#include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/LatticePhase.h"
-#include "cantera/thermo/SpeciesThermo.h"
 #include "cantera/thermo/ThermoFactory.h"
 #include "cantera/base/stringUtils.h"
+#include "cantera/base/ctml.h"
+#include "cantera/base/vec_functions.h"
 
 namespace Cantera
 {
@@ -21,7 +19,6 @@ namespace Cantera
 LatticePhase::LatticePhase() :
     m_Pref(OneAtm),
     m_Pcurrent(OneAtm),
-    m_tlast(0.0),
     m_speciesMolarVolume(0),
     m_site_density(0.0)
 {
@@ -30,11 +27,10 @@ LatticePhase::LatticePhase() :
 LatticePhase::LatticePhase(const LatticePhase& right) :
     m_Pref(OneAtm),
     m_Pcurrent(OneAtm),
-    m_tlast(0.0),
     m_speciesMolarVolume(0),
     m_site_density(0.0)
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 LatticePhase& LatticePhase::operator=(const LatticePhase& right)
@@ -43,7 +39,6 @@ LatticePhase& LatticePhase::operator=(const LatticePhase& right)
         ThermoPhase::operator=(right);
         m_Pref       = right.m_Pref;
         m_Pcurrent     = right.m_Pcurrent;
-        m_tlast      = right.m_tlast;
         m_h0_RT      = right.m_h0_RT;
         m_cp0_R      = right.m_cp0_R;
         m_g0_RT      = right.m_g0_RT;
@@ -78,23 +73,10 @@ doublereal LatticePhase::enthalpy_mole() const
            + (pressure() - p0)/molarDensity();
 }
 
-doublereal LatticePhase::intEnergy_mole() const
-{
-    doublereal p0 = m_spthermo->refPressure();
-    return GasConstant * temperature() *
-           mean_X(&enthalpy_RT_ref()[0])
-           - p0/molarDensity();
-}
-
 doublereal LatticePhase::entropy_mole() const
 {
     return GasConstant * (mean_X(&entropy_R_ref()[0]) -
                           sum_xlogx());
-}
-
-doublereal LatticePhase::gibbs_mole() const
-{
-    return enthalpy_mole() - temperature() * entropy_mole();
 }
 
 doublereal LatticePhase::cp_mole() const
@@ -112,17 +94,6 @@ doublereal LatticePhase::calcDensity()
     setMolarDensity(m_site_density);
     doublereal mw = meanMolecularWeight();
     doublereal dens = mw * m_site_density;
-    /*
-     * Calculate the molarVolume of the solution (m**3 kmol-1)
-     */
-    // const doublereal * const dtmp = moleFractdivMMW();
-    // doublereal invDens = dot(m_speciesMolarVolume.begin(), m_speciesMolarVolume.end(), dtmp);
-    /*
-     * Set the density in the parent State object directly,
-     * by calling the Phase::setDensity() function.
-     */
-    // doublereal dens = 1.0/invDens;
-    //  Phase::setDensity(dens);
     return dens;
 }
 

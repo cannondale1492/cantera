@@ -8,7 +8,6 @@
  * U.S. Government retains certain rights in this software.
  */
 
-#include "cantera/equil/vcs_solve.h"
 #include "cantera/equil/vcs_species_thermo.h"
 #include "cantera/equil/vcs_defs.h"
 #include "cantera/equil/vcs_VolPhase.h"
@@ -17,6 +16,7 @@
 #include "cantera/equil/vcs_internal.h"
 
 using namespace std;
+using namespace Cantera;
 
 namespace VCSnonideal
 {
@@ -123,10 +123,8 @@ VCS_SPECIES_THERMO* VCS_SPECIES_THERMO::duplMyselfAsVCS_SPECIES_THERMO()
 double VCS_SPECIES_THERMO::GStar_R_calc(size_t kglob, double TKelvin,
                                         double pres)
 {
-    char yo[] = "VCS_SPECIES_THERMO::GStar_R_calc ";
-    double fe, T;
-    fe = G0_R_calc(kglob, TKelvin);
-    T = TKelvin;
+    double fe = G0_R_calc(kglob, TKelvin);
+    double T = TKelvin;
     if (UseCanteraCalls) {
         if (m_VCS_UnitsFormat != VCS_UNITS_MKS) {
             throw Cantera::CanteraError("VCS_SPECIES_THERMO::GStar_R_calc",
@@ -146,20 +144,19 @@ double VCS_SPECIES_THERMO::GStar_R_calc(size_t kglob, double TKelvin,
             fe += T * log(pres/ pref);
             break;
         default:
-            plogf("%sERROR: unknown SSStar model\n", yo);
-            exit(EXIT_FAILURE);
+            throw CanteraError("VCS_SPECIES_THERMO::GStar_R_calc",
+                               "unknown SSStar model");
         }
     }
     return fe;
 }
 
-double VCS_SPECIES_THERMO::
-VolStar_calc(size_t kglob, double TKelvin, double presPA)
+double VCS_SPECIES_THERMO::VolStar_calc(size_t kglob, double TKelvin, 
+                                        double presPA)
 {
-    char yo[] = "VCS_SPECIES_THERMO::VStar_calc ";
-    double vol, T;
+    double vol;
 
-    T = TKelvin;
+    double T = TKelvin;
     if (UseCanteraCalls) {
         if (m_VCS_UnitsFormat != VCS_UNITS_MKS) {
             throw Cantera::CanteraError("VCS_SPECIES_THERMO::VolStar_calc",
@@ -177,8 +174,8 @@ VolStar_calc(size_t kglob, double TKelvin, double presPA)
             vol= Cantera::GasConstant * T / presPA;
             break;
         default:
-            plogf("%sERROR: unknown SSVol model\n", yo);
-            exit(EXIT_FAILURE);
+            throw CanteraError("VCS_SPECIES_THERMO::VolStar_calc",
+                               "unknown SSVol model");
         }
     }
     return vol;
@@ -186,9 +183,6 @@ VolStar_calc(size_t kglob, double TKelvin, double presPA)
 
 double VCS_SPECIES_THERMO::G0_R_calc(size_t kglob, double TKelvin)
 {
-#ifdef DEBUG_MODE
-    char yo[] = "VS_SPECIES_THERMO::G0_R_calc ";
-#endif
     double fe, H, S;
     if (SS0_Model == VCS_SS0_CONSTANT) {
         return SS0_feSave;
@@ -217,10 +211,8 @@ double VCS_SPECIES_THERMO::G0_R_calc(size_t kglob, double TKelvin)
             fe = H - TKelvin * S;
             break;
         default:
-#ifdef DEBUG_MODE
-            plogf("%sERROR: unknown model\n", yo);
-#endif
-            exit(EXIT_FAILURE);
+            throw CanteraError("VCS_SPECIES_THERMO::G0_R_calc",
+                               "unknown model");
         }
     }
     SS0_feSave = fe;
@@ -230,9 +222,6 @@ double VCS_SPECIES_THERMO::G0_R_calc(size_t kglob, double TKelvin)
 
 double VCS_SPECIES_THERMO::eval_ac(size_t kglob)
 {
-#ifdef DEBUG_MODE
-    char yo[] = "VCS_SPECIES_THERMO::eval_ac ";
-#endif
     double ac;
     /*
      *  Activity coefficients are frequently evaluated on a per phase
@@ -249,10 +238,7 @@ double VCS_SPECIES_THERMO::eval_ac(size_t kglob)
             ac = 1.0;
             break;
         default:
-#ifdef DEBUG_MODE
-            plogf("%sERROR: unknown model\n", yo);
-#endif
-            exit(EXIT_FAILURE);
+            throw CanteraError("VCS_SPECIES_THERMO::eval_ac" ,"unknown model");
         }
     }
     return ac;

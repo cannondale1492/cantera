@@ -3,16 +3,8 @@
  *  Transport properties for aqueous systems
  */
 
-#include "cantera/thermo/ThermoPhase.h"
 #include "cantera/transport/AqueousTransport.h"
-
-#include "cantera/base/utilities.h"
-#include "cantera/transport/TransportParams.h"
 #include "cantera/transport/LiquidTransportParams.h"
-#include "cantera/transport/TransportFactory.h"
-
-#include "cantera/numerics/ctlapack.h"
-
 #include "cantera/base/stringUtils.h"
 
 #include <cstdio>
@@ -58,9 +50,6 @@ bool AqueousTransport::initLiquid(LiquidTransportParams& tr)
          m_thermo->molecularWeights().end(), m_mw.begin());
 
     // copy polynomials and parameters into local storage
-    //m_visccoeffs = tr.visccoeffs;
-    //m_condcoeffs = tr.condcoeffs;
-    //m_diffcoeffs = tr.diffcoeffs;
     cout << "In AqueousTransport::initLiquid we need to replace" << endl
          << "LiquidTransportParams polynomial coefficients with" << endl
          <<  "those in LiquidTransportData as in SimpleTransport." << endl;
@@ -338,15 +327,6 @@ void AqueousTransport::update_C()
 {
 
     doublereal pres = m_thermo->pressure();
-    // Check for changes in the mole fraction vector.
-    //int iStateNew = m_thermo->getIStateMF();
-    //if (iStateNew == m_iStateMF) {
-    //  if (pres == m_press) {
-    //    return;
-    //     }
-    // } else {
-    //  m_iStateMF = iStateNew;
-    //}
     m_press = pres;
 
     // signal that concentration-dependent quantities will need to
@@ -465,16 +445,6 @@ void AqueousTransport::stefan_maxwell_solve()
     // grab a local copy of the molecular weights
     const vector_fp& M =  m_thermo->molecularWeights();
 
-
-    // get the mean molecular weight of the mixture
-    //double M_mix = m_thermo->meanMolecularWeight();
-
-
-    // get the concentration of the mixture
-    //double rho = m_thermo->density();
-    //double c = rho/M_mix;
-
-
     m_thermo->getMoleFractions(DATA_PTR(m_molefracs));
 
     double T = m_thermo->temperature();
@@ -536,9 +506,6 @@ void AqueousTransport::stefan_maxwell_solve()
             }
         }
 
-        //! invert and solve the system  Ax = b. Answer is in m_B
-        //solve(m_A, m_B);
-
         m_flux = m_B;
 
 
@@ -564,9 +531,6 @@ void AqueousTransport::stefan_maxwell_solve()
                 }
             }
         }
-
-        //! invert and solve the system  Ax = b. Answer is in m_B
-        //solve(m_A, m_B);
 
         m_flux = m_B;
 

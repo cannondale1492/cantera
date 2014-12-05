@@ -12,11 +12,10 @@
  *
  * Copyright 2001 California Institute of Technology
  */
-#include "cantera/base/ct_defs.h"
-#include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/StoichSubstanceSSTP.h"
-#include "cantera/thermo/SpeciesThermo.h"
+#include "cantera/thermo/mix_defs.h"
 #include "cantera/thermo/ThermoFactory.h"
+#include "cantera/base/ctml.h"
 
 namespace Cantera
 {
@@ -74,7 +73,7 @@ StoichSubstanceSSTP::StoichSubstanceSSTP(XML_Node& xmlphase, const std::string& 
 StoichSubstanceSSTP::StoichSubstanceSSTP(const StoichSubstanceSSTP&  right) :
     SingleSpeciesTP()
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 StoichSubstanceSSTP&
@@ -128,8 +127,7 @@ doublereal StoichSubstanceSSTP::thermalExpansionCoeff() const
  * ---- Chemical Potentials and Activities ----
  */
 
-void StoichSubstanceSSTP::
-getActivityConcentrations(doublereal* c) const
+void StoichSubstanceSSTP::getActivityConcentrations(doublereal* c) const
 {
     c[0] = 1.0;
 }
@@ -144,8 +142,7 @@ doublereal StoichSubstanceSSTP::logStandardConc(size_t k) const
     return 0.0;
 }
 
-void StoichSubstanceSSTP::
-getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
+void StoichSubstanceSSTP::getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
 {
     for (int i = 0; i < 6; i++) {
         uA[i] = 0;
@@ -156,8 +153,7 @@ getUnitsStandardConc(doublereal* uA, int k, int sizeUA) const
  * Properties of the Standard State of the Species in the Solution
  */
 
-void StoichSubstanceSSTP::
-getStandardChemPotentials(doublereal* mu0) const
+void StoichSubstanceSSTP::getStandardChemPotentials(doublereal* mu0) const
 {
     getGibbs_RT(mu0);
     mu0[0] *= GasConstant * temperature();
@@ -328,7 +324,7 @@ electrodeElectron::electrodeElectron(XML_Node& xmlphase, const std::string& id_)
 electrodeElectron::electrodeElectron(const electrodeElectron&  right) :
     StoichSubstanceSSTP()
 {
-    *this = operator=(right);
+    *this = right;
 }
 
 electrodeElectron&
