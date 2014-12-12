@@ -194,7 +194,7 @@ public:
     }
 
 	///Turn radiation on / off
-	void solveRadiationEqn(bool doRadiation) {
+	void enableRadiation(bool doRadiation) {
 		if (doRadiation) {
 			do_radiation = true;
 		} else {
@@ -513,7 +513,7 @@ protected:
 	doublereal epsilon_right;
 
     // flags
-    std::vector<bool> m_do_energy;	
+    std::vector<bool> m_do_energy;
     bool m_do_soret;
     std::vector<bool> m_do_species;
     int m_transport_option;

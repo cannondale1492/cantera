@@ -389,8 +389,8 @@ cdef class _FlowBase(Domain1D):
         self.flow.setBoundaryEmissivities(e__left, e__right)
         
     #turn radiation solving on / off
-    def solve_radiation_equation(self, do_Radiation):
-        self.flow.solveRadiationEqn(do_Radiation)
+    def radiation_enabled(self, do_Radiation):
+        self.flow.enableRadiation(do_Radiation)
 
 
 cdef CxxIdealGasPhase* getIdealGasPhase(ThermoPhase phase) except *:

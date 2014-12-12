@@ -564,17 +564,15 @@ void StFlow::showSolution(const doublereal* x)
         }
     }
     writelog("\n");
-    /*AR*/
-    st_drawline();
+    //st_drawline();
     sprintf(buf, "        z       radiative heat loss");
     writelog(buf);
-    st_drawline();
+    //st_drawline();
     for (j = 0; j < m_points; j++) {
         sprintf(buf, "\n %10.4g        %10.4g", m_z[j], m_qdotRadiation[j]);
         writelog(buf);
     }
     writelog("\n");
-    /*AR*/
 }
 
 void StFlow::updateDiffFluxes(const doublereal* x, size_t j0, size_t j1)
