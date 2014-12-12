@@ -193,7 +193,11 @@ public:
         }
     }
 
-	///Turn radiation on / off
+	/*!Turn radiation on / off
+    The used simple radiation model was established by Y. Liu and B. Rogg [Y. Liu and B. Rogg,
+    Modelling of thermally radiating diffusion flames with detailed chemistry and transport,
+    EUROTHERM Seminars, 17:114–127, 1991]. This model considers the radiation of CO2 and H2O.
+    */
 	void enableRadiation(bool doRadiation) {
 		if (doRadiation) {
 			do_radiation = true;

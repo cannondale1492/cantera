@@ -575,7 +575,7 @@ void StFlow::showSolution(const doublereal* x)
     writelog("\n");
     if (do_radiation){
         writeline('-', 79, false, true);
-        sprintf(buf, "        z       radiative heat loss");
+        sprintf(buf, "       z      radiative heat loss");
         writelog(buf);
         writeline('-', 79, false, true);
         for (j = 0; j < m_points; j++) {
