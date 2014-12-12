@@ -197,10 +197,8 @@ public:
 	void solveRadiationEqn(bool doRadiation) {
 		if (doRadiation) {
 			do_radiation = true;
-			writelog("Radiative heat losses activated!\n");
 		} else {
 			do_radiation = false;
-			writelog("Radiative heat losses deactivated!\n");
 		}
 	}
 
@@ -210,7 +208,6 @@ public:
 	* 	variables, which are used for the calculation.
 	*/
 	void setBoundaryEmissivities(doublereal e_left, doublereal e_right) {
-		char buf[100];
 		if (e_left < 0 || e_left > 1) {
 			throw CanteraError("setBoundaryEmissivities",
             "The left boundary emissivity must be between 0.0 and 1.0!");
@@ -220,10 +217,6 @@ public:
 		} else {
 			epsilon_left = e_left;
 			epsilon_right = e_right;
-			sprintf(buf, "\nThe joint emissivity for the left inlet was set to:  %2.6g\n", epsilon_left);
-			writelog(buf);
-			sprintf(buf, "The joint emissivity for the right inlet was set to:  %2.6g\n", epsilon_right);
-			writelog(buf);
 		}
 	}
 
