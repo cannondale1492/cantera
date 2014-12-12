@@ -280,7 +280,16 @@ void StFlow::eval(size_t jg, doublereal* xg,
 
     doublereal sum, sum2, dtdzj;
 
-	// calculation of qdotRadiation
+	/* calculation of qdotRadiation
+    The used simple radiation model was established by Y. Liu and B. Rogg [Y. Liu and B. Rogg,
+    Modelling of thermally radiating diffusion flames with detailed chemistry and transport,
+    EUROTHERM Seminars, 17:114–127, 1991]. This model uses the optically thin limit and the
+    grey-gas approximation to simply calculate a volume specified heat flux out of the Planck
+    absorption coefficients, the boundary emissivities and the temperatur. The model considers
+    only CO2 and H2O as radiating species. Polynomial lines calculate the Planck coefficients
+    for the species H2O and CO2. The coefficients of these lines are taken out of the
+    Cosilab Manual [Cosilab Documentation, 1D premixed flames and counterflow diffusion flames,
+    Section B.1, 23.04.2007].*/
     // set the number of points in the radiative heat loss vector
     m_qdotRadiation.reserve(m_points);
 
@@ -564,15 +573,17 @@ void StFlow::showSolution(const doublereal* x)
         }
     }
     writelog("\n");
-    //st_drawline();
-    sprintf(buf, "        z       radiative heat loss");
-    writelog(buf);
-    //st_drawline();
-    for (j = 0; j < m_points; j++) {
-        sprintf(buf, "\n %10.4g        %10.4g", m_z[j], m_qdotRadiation[j]);
+    if (do_radiation){
+        writeline('-', 79, false, true);
+        sprintf(buf, "        z       radiative heat loss");
         writelog(buf);
+        writeline('-', 79, false, true);
+        for (j = 0; j < m_points; j++) {
+            sprintf(buf, "\n %10.4g        %10.4g", m_z[j], m_qdotRadiation[j]);
+            writelog(buf);
+        }
+        writelog("\n");
     }
-    writelog("\n");
 }
 
 void StFlow::updateDiffFluxes(const doublereal* x, size_t j0, size_t j1)
