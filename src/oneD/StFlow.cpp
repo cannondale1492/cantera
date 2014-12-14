@@ -480,9 +480,7 @@ void StFlow::eval(size_t jg, doublereal* xg,
 
                 rsd[index(c_offset_T, j)] -= rdt*(T(x,j) - T_prev(j));
                 rsd[index(c_offset_T, j)] -= (m_qdotRadiation[j] / (m_rho[j] * m_cp[j]));
-               
-                diag[index(c_offset_T, j)] = 1;
-                
+                diag[index(c_offset_T, j)] = 1;               
             } else {
                 // residual equations if the energy equation is disabled
                 rsd[index(c_offset_T, j)] = T(x,j) - T_fixed(j);
@@ -887,10 +885,10 @@ XML_Node& StFlow::save(XML_Node& o, const doublereal* const sol)
         addFloatArray(gv,m_thermo->speciesName(k),
                       x.size(),DATA_PTR(x),"","massFraction");
     }
-
-    addFloatArray(gv, "radiative_heat_loss", m_z.size(), DATA_PTR(m_qdotRadiation),
-        "W/m^3", "specificPower");
-
+    if (do_radiation){
+        addFloatArray(gv, "radiative_heat_loss", m_z.size(), DATA_PTR(m_qdotRadiation),
+            "W/m^3", "specificPower");
+    }
     vector_fp values(nPoints());
     for (size_t i = 0; i < nPoints(); i++) {
         values[i] = m_do_energy[i];
