@@ -387,6 +387,8 @@ class TestDiffusionFlame(utilities.CanteraTest):
         self.sim = ct.CounterflowDiffusionFlame(self.gas, initial_grid)
         self.sim.flame.set_steady_tolerances(default=tol_ss)
         self.sim.flame.set_transient_tolerances(default=tol_ts)
+        self.sim.flame.radiation_enabled(0)
+        self.sim.flame.set_boundary_emissivities(0,0)
 
         # Set properties of the fuel and oxidizer mixtures
         self.sim.fuel_inlet.mdot = mdot_fuel
@@ -502,6 +504,8 @@ class TestCounterflowPremixedFlame(utilities.CanteraTest):
 
         sim.set_refine_criteria(ratio=3, slope=0.2, curve=0.4, prune=0.02)
         sim.energy_enabled = True
+        sim.flame.radiation_enabled(0)
+        sim.flame.set_boundary_emissivities(0,0)
         sim.solve(loglevel=0, refine_grid=True)
 
         data = np.empty((sim.flame.n_points, gas.n_species + 4))
@@ -517,3 +521,32 @@ class TestCounterflowPremixedFlame(utilities.CanteraTest):
             bad = utilities.compareProfiles(self.referenceFile, data,
                                             rtol=1e-2, atol=1e-8, xtol=1e-2)
             self.assertFalse(bad, bad)
+    
+    def test_mixture_averaged_radiation(self, saveReference=False):
+        T_in = 373.0  # inlet temperature
+        comp = 'H2:1.6, O2:1, AR:7'  # premixed gas composition
+
+        gas = ct.Solution('h2o2.xml')
+        gas.TPX = T_in, 0.05 * ct.one_atm, comp
+        initial_grid = np.linspace(0.0, 0.2, 12)  # m
+
+        sim = ct.CounterflowPremixedFlame(gas=gas, grid=initial_grid)
+
+        # set the properties at the inlets
+        sim.reactants.mdot = 0.12  # kg/m^2/s
+        sim.reactants.X = comp
+        sim.reactants.T = T_in
+        sim.products.mdot = 0.06  # kg/m^2/s
+
+        sim.flame.set_steady_tolerances(default=[1.0e-5, 1.0e-11])
+        sim.flame.set_transient_tolerances(default=[1.0e-5, 1.0e-11])
+        sim.set_initial_guess()  # assume adiabatic equilibrium products
+
+        sim.energy_enabled = False
+        sim.solve(loglevel=0, refine_grid=False)
+
+        sim.set_refine_criteria(ratio=3, slope=0.2, curve=0.4, prune=0.02)
+        sim.energy_enabled = True
+        sim.flame.radiation_enabled(1)
+        sim.flame.set_boundary_emissivities(0.1,0.1)
+        sim.solve(loglevel=0, refine_grid=True)
