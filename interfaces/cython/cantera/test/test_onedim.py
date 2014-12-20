@@ -452,7 +452,8 @@ class TestDiffusionFlame(utilities.CanteraTest):
         self.solve_fixed_T()
         self.assertEqual(nPoints, len(self.sim.grid))
         self.assertArrayNear(Tfixed, self.sim.T)
-        self.sim.flame.radiation_enabled(0)
+        self.sim.flame.radiation_enabled(1)
+        self.sim.flame.set_boundary_emissivities(0.25,0.15)
         
         self.solve_mix()
         data = np.empty((self.sim.flame.n_points, self.gas.n_species + 4))
