@@ -444,7 +444,7 @@ class TestDiffusionFlame(utilities.CanteraTest):
             self.assertFalse(bad, bad)
             
     def test_mixture_averaged_rad(self, saveReference=False):
-        referenceFile = '../data/DiffusionFlameTest-h2-mix-rad.csv'
+        self.referenceFile = '../data/DiffusionFlameTest-h2-mix-rad.csv'
         self.create_sim(p=ct.one_atm)
 
         nPoints = len(self.sim.grid)
