@@ -286,10 +286,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
     EUROTHERM Seminars, 17:114–127, 1991]. This model uses the optically thin limit and the
     grey-gas approximation to simply calculate a volume specified heat flux out of the Planck
     absorption coefficients, the boundary emissivities and the temperatur. The model considers
-    only CO2 and H2O as radiating species. Polynomial lines calculate the Planck coefficients
-    for the species H2O and CO2. The coefficients of these lines are taken out of the
-    Cosilab Manual [Cosilab Documentation, 1D premixed flames and counterflow diffusion flames,
-    Section B.1, 23.04.2007].*/
+    only CO2 and H2O as radiating species. Polynomial lines calculate the species Planck coefficients
+    for the H2O and CO2. The coefficients of these lines are taken out of the paper from
+    Hubbard and Tien [G. Hubbard and C. Tien, Infrared mean absorption coefficients of luminous
+    flames and smoke, Journal of Heat Transfer 100(2), 235-239, 1978].*/
     // set the number of points in the radiative heat loss vector
     m_qdotRadiation.reserve(m_points);
 
