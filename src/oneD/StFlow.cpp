@@ -287,7 +287,7 @@ void StFlow::eval(size_t jg, doublereal* xg,
     grey-gas approximation to simply calculate a volume specified heat flux out of the Planck
     absorption coefficients, the boundary emissivities and the temperatur. The model considers
     only CO2 and H2O as radiating species. Polynomial lines calculate the species Planck coefficients
-    for the H2O and CO2. The coefficients of these lines are taken out of the paper from
+    for the H2O and CO2. The data for the coefficients of these lines is taken out of the paper from
     Hubbard and Tien [G. Hubbard and C. Tien, Infrared mean absorption coefficients of luminous
     flames and smoke, Journal of Heat Transfer 100(2), 235-239, 1978].*/
     // set the number of points in the radiative heat loss vector
@@ -318,6 +318,17 @@ void StFlow::eval(size_t jg, doublereal* xg,
         // calculation of the two boundary values
         boundary_Rad_left = epsilon_left * StefanBoltz * pow(T(x, 0), 4);
         boundary_Rad_right = epsilon_right * StefanBoltz * pow(T(x, m_points - 1), 4);
+        
+        // check if H2O and / or CO2 are in the mechanism and set their positions
+		for (size_t n_comp = 0; n_comp < m_nv; n_comp++){
+			if (componentName(n_comp) == "H2O"){
+				position_H2O = componentIndex("H2O") - c_offset_Y;
+				check_H2O = 1;
+			} else if (componentName(n_comp) == "CO2") {
+                position_CO2 = componentIndex("CO2") - c_offset_Y;
+                check_CO2 = 1;
+			}
+        }
 
         // loop over all grid points
         for (size_t jnew = 0; jnew < m_points; jnew++){
@@ -330,26 +341,20 @@ void StFlow::eval(size_t jg, doublereal* xg,
 
             // loop for the polynomial rows
             for (size_t n = 0; n <= 6; n++){
-                // absorption coefficient for H2O
-                sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
-                k_P_H2O = pow(10, sum_H2O);
-                k_P_H2O /= k_P_ref;
-                // absorption coefficient for CO2
+                if (check_H2O == 1){
+                    sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
+                }
+                if (check_CO2 == 1){
                 sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
-                k_P_CO2 = pow(10, sum_CO2);
-                k_P_CO2 /= k_P_ref;
+                }
             }
-
-            // check if H2O and / or CO2 are in the mechanism and set their positions
-			for (size_t n_comp = 0; n_comp < m_nv; n_comp++){
-				if (componentName(n_comp) == "H2O"){
-					position_H2O = componentIndex("H2O") - c_offset_Y;
-					check_H2O = 1;
-				} else if (componentName(n_comp) == "CO2") {
-                    position_CO2 = componentIndex("CO2") - c_offset_Y;
-                    check_CO2 = 1;
-				}
-			}
+            
+            // absorption coefficient for H2O
+            k_P_H2O = pow(10, sum_H2O);
+            k_P_H2O /= k_P_ref;
+            // absorption coefficient for CO2
+            k_P_CO2 = pow(10, sum_CO2);
+            k_P_CO2 /= k_P_ref;
 
             // calculation of k_P
             k_P = m_press * (X(x, position_H2O, jnew) * k_P_H2O * check_H2O
