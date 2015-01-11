@@ -340,12 +340,14 @@ void StFlow::eval(size_t jg, doublereal* xg,
             sum_CO2 = 0;
 
             // loop for the polynomial rows
-            for (size_t n = 0; n <= 6; n++){
-                if (check_H2O == 1){
+            if (check_H2O == 1){
+                for (size_t n = 0; n <= 6; n++){
                     sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
                 }
-                if (check_CO2 == 1){
-                sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
+            }
+            if (check_CO2 == 1){
+                for (size_t n = 0; n <= 6; n++){
+                    sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
                 }
             }
             
