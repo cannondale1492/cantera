@@ -287,10 +287,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
     grey-gas approximation to simply calculate a volume specified heat flux out of the Planck
     absorption coefficients, the boundary emissivities and the temperatur. The model considers
     only CO2 and H2O as radiating species. Polynomial lines calculate the species Planck coefficients
-    for the H2O and CO2. The data for the lines is taken from the RADCAL program [Grosshandler, W. L.,
+    for H2O and CO2. The data for the lines is taken from the RADCAL program [Grosshandler, W. L.,
     RADCAL: A Narrow-Band Model for Radiation Calculations in a Combustion Environment, NIST technical
-    note 1402, 1993. The coeffients for the polynomials are taken from 
-    http://www.sandia.gov/TNF/radiation.html .*/
+    note 1402, 1993]. The coeffients for the polynomials are taken from 
+    [http://www.sandia.gov/TNF/radiation.html].*/
     // set the number of points in the radiative heat loss vector
     m_qdotRadiation.reserve(m_points);
 
