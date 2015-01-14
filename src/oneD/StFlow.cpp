@@ -287,9 +287,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
     grey-gas approximation to simply calculate a volume specified heat flux out of the Planck
     absorption coefficients, the boundary emissivities and the temperatur. The model considers
     only CO2 and H2O as radiating species. Polynomial lines calculate the species Planck coefficients
-    for the H2O and CO2. The data for the coefficients of these lines is taken out of the paper from
-    Hubbard and Tien [G. Hubbard and C. Tien, Infrared mean absorption coefficients of luminous
-    flames and smoke, Journal of Heat Transfer 100(2), 235-239, 1978].*/
+    for the H2O and CO2. The data for the lines is taken from the RADCAL program [Grosshandler, W. L.,
+    RADCAL: A Narrow-Band Model for Radiation Calculations in a Combustion Environment, NIST technical
+    note 1402, 1993. The coeffients for the polynomials are taken from 
+    http://www.sandia.gov/TNF/radiation.html .*/
     // set the number of points in the radiative heat loss vector
     m_qdotRadiation.reserve(m_points);
 
@@ -298,8 +299,6 @@ void StFlow::eval(size_t jg, doublereal* xg,
         doublereal k_P_H2O = 0;
         doublereal k_P_CO2 = 0;
         doublereal k_P_ref = 1.0*OneAtm;
-        doublereal sum_H2O = 0;
-        doublereal sum_CO2 = 0;
         doublereal k_P = 0;
         size_t position_H2O = 0;
         size_t position_CO2 = 0;
@@ -307,10 +306,10 @@ void StFlow::eval(size_t jg, doublereal* xg,
         size_t check_CO2 = 0;
 
         // polynomial coefficients:
-        const doublereal a_H2O[7] = { 0.38041e01, -0.27808e01, 0.11672e01,
-        -0.28491, 0.38163e-01, -0.26292e-02, 0.73662e-04 };
-        const doublereal a_CO2[7] = { 0.22317e01, -0.15829e01, 0.13296e01,
-        -0.50707, 0.93334e-01, -0.83108e-02, 0.28834e-03 };
+        const doublereal c_H2O[6] = { -0.23093, -1.12390, 9.41530, -2.99880, 
+        0.51382, -1.86840e-5 };
+        const doublereal c_CO2[6] = { 18.741, -121.310, 273.500, -194.050,
+        56.310, -5.8169};
         // boundary values:
         doublereal boundary_Rad_left = 0;
         doublereal boundary_Rad_right = 0;
@@ -334,28 +333,24 @@ void StFlow::eval(size_t jg, doublereal* xg,
         for (size_t jnew = 0; jnew < m_points; jnew++){
             // helping variable for the calculation
             doublereal radiative_heat_loss = 0;
-            // calculation of the mean Planck absorption coefficient
-            // initialization of the sums to zero
-            sum_H2O = 0;
-            sum_CO2 = 0;
-
-            // loop for the polynomial rows
-            if (check_H2O == 1){
-                for (size_t n = 0; n <= 6; n++){
-                    sum_H2O += a_H2O[n] * pow(T(x, jnew) / 300, (double)n);
-                }
-            }
-            if (check_CO2 == 1){
-                for (size_t n = 0; n <= 6; n++){
-                    sum_CO2 += a_CO2[n] * pow(T(x, jnew) / 300, (double)n);
-                }
-            }
             
+            // calculation of the mean Planck absorption coefficient
+            k_P_H2O = 0;
+            k_P_CO2 = 0;
             // absorption coefficient for H2O
-            k_P_H2O = pow(10, sum_H2O);
-            k_P_H2O /= k_P_ref;
+            if (check_H2O == 1){            
+                for (size_t n = 0; n <= 5; n++){
+                k_P_H2O += c_H2O[n] * pow(1000 / T(x, jnew), (double)n);
+                }
+            }
             // absorption coefficient for CO2
-            k_P_CO2 = pow(10, sum_CO2);
+            if (check_CO2 == 1){
+                for (size_t n = 0; n <= 5; n++){
+                k_P_CO2 += c_CO2[n] * pow(1000 / T(x, jnew), (double)n);
+                }
+            }
+            // normalizing the coefficients
+            k_P_H2O /= k_P_ref;
             k_P_CO2 /= k_P_ref;
 
             // calculation of k_P
